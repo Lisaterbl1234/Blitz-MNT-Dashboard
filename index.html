@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blitz MNT Invoice Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>&#128196; Blitz MNT Invoice Tracker</h1>
+    <p>Sign in with your team account to continue.</p>
+    <form id="login-form">
+      <div class="fr"><label>Email</label><input type="email" id="login-email" autocomplete="username" required></div>
+      <div class="fr"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" required></div>
+      <button type="submit" class="btn btn-blue">Sign In</button>
+    </form>
+    <div id="login-msg"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+<div id="err-banner"></div>
+<header>
+  <h1>&#128196; Blitz MNT Invoice Tracker</h1>
+  <div class="hdr-right">
+    <span id="last-saved"></span>
+    <div id="sync-badge" title="Live sync status">
+      <span class="sync-dot"></span><span id="sync-text">&#128293; Live</span>
+    </div>
+    <span class="user-email" id="user-email"></span>
+    <button class="hbtn" id="sign-out-btn">Sign Out</button>
+  </div>
+</header>
+<div class="tabs">
+  <div class="tab active" id="tab-mnt">&#128203; MNT Quotes / POs</div>
+  <div class="tab" id="tab-fttb">&#128296; FTTB Patching</div>
+</div>
+
+<div id="mnt-sec">
+  <div class="stats" id="stats-row"></div>
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search doc no, reference, rep...">
+    <select id="fil-status">
+      <option value="">All POs</option>
+      <option value="outstanding">PO Outstanding</option>
+      <option value="tobeinvoiced">To Be Invoiced</option>
+      <option value="invoice">Invoiced</option>
+      <option value="quotes">Quotes</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+    <select id="fil-rep"><option value="">All Reps</option></select>
+    <select id="fil-month">
+      <option value="">All Months</option>
+      <option value="01">January</option><option value="02">February</option><option value="03">March</option>
+      <option value="04">April</option><option value="05">May</option><option value="06">June</option>
+      <option value="07">July</option><option value="08">August</option><option value="09">September</option>
+      <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+    </select>
+    <select id="fil-dt"><option value="date">Quote Date</option><option value="expiry">Expiry Date</option></select>
+    <span class="dlbl">From <input type="date" id="d-from"></span>
+    <span class="dlbl">To <input type="date" id="d-to"></span>
+    <button class="btn btn-grey" id="clear-dates-btn" style="padding:6px 9px">&#215; Dates</button>
+    <button class="btn btn-blue" id="add-mnt-btn" style="margin-left:auto">+ Add Quote / PO</button>
+    <button class="btn btn-green" id="import-mnt-btn">&#128202; Import Excel</button>
+  </div>
+  <button class="btn-hod" id="hod-btn">&#128202; HOD Report</button>
+  <div class="rcnt" id="rcnt"></div>
+  <div class="tblw">
+    <table>
+      <thead><tr>
+        <th data-sort="date">Date &#8597;</th>
+        <th data-sort="expiry">Expiry &#8597;</th>
+        <th data-sort="docNo">Doc No &#8597;</th>
+        <th>Customer Ref</th>
+        <th data-sort="amount">Amount &#8597;</th>
+        <th data-sort="rep">Sales Rep &#8597;</th>
+        <th>Status</th>
+        <th>Notes</th>
+        <th>Doc</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="fttb-sec" style="display:none">
+  <div class="stats" id="fttb-stats"></div>
+  <div class="toolbar">
+    <input type="text" id="fttb-srch" placeholder="Search customer, ticket, FRG ref...">
+    <select id="fttb-fil-stage">
+      <option value="">All Stages</option>
+      <option value="Survey">Survey</option>
+      <option value="Scheduling">Scheduling</option>
+      <option value="Build">Build</option>
+      <option value="Job Report Approvals">Job Report Approvals</option>
+      <option value="FF Approved">FF Approved</option>
+    </select>
+    <select id="fttb-fil-status">
+      <option value="">All Invoice Status</option>
+      <option value="invoiced">Invoiced</option>
+      <option value="toinvoice">To Invoice</option>
+      <option value="pending">Pending</option>
+    </select>
+    <button class="btn btn-blue" id="add-fttb-btn" style="margin-left:auto">+ Add FTTB Record</button>
+    <button class="btn btn-green" id="import-fttb-btn">&#128202; Import FTTB</button>
+  </div>
+  <div class="rcnt" id="fttb-rcnt"></div>
+  <div class="tblw">
+    <table>
+      <thead><tr>
+        <th>FRG Ref</th><th>Link Status</th><th>Customer</th><th>Job Type</th>
+        <th>Ticket</th><th>Stage</th><th>Invoice Status</th><th>Amount</th><th>Notes</th>
+      </tr></thead>
+      <tbody id="fttb-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL (MNT) -->
+<div class="ov" id="add-ov">
+  <div class="mdl">
+    <h2 id="m-title">Add Quote / PO</h2>
+    <div class="fr"><label>Date</label><input type="date" id="m-date"></div>
+    <div class="fr"><label>Expiry</label><input type="date" id="m-expiry"></div>
+    <div class="fr"><label>Doc No.</label><input type="text" id="m-docno" placeholder="QUO0003000"></div>
+    <div class="fr"><label>Customer Ref</label><input type="text" id="m-ref"></div>
+    <div class="fr"><label>Amount (R)</label><input type="number" id="m-amount" step="0.01"></div>
+    <div class="fr"><label>Sales Rep</label><input type="text" id="m-rep"></div>
+    <div class="fr"><label>Status</label>
+      <select id="m-status">
+        <option value="outstanding">PO Outstanding</option>
+        <option value="tobeinvoiced">To Be Invoiced</option>
+        <option value="invoice">Invoiced</option>
+        <option value="quotes">Quote</option>
+        <option value="cancelled">Cancelled</option>
+      </select></div>
+    <div class="fr"><label>Notes</label><textarea id="m-notes"></textarea></div>
+    <div class="fr"><label>Attach PDF</label><input type="file" id="m-pdf" accept=".pdf"></div>
+    <div id="m-pdf-cur" style="font-size:.78rem;color:#888;margin-top:3px"></div>
+    <div class="mbtns">
+      <button class="btn btn-grey" id="m-cancel-btn">Cancel</button>
+      <button class="btn btn-blue" id="m-save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- FTTB MODAL -->
+<div class="ov" id="fttb-ov">
+  <div class="mdl">
+    <h2 id="fm-title">Add FTTB Record</h2>
+    <div class="fr"><label>FRG Ref</label><input type="text" id="fm-frgref"></div>
+    <div class="fr"><label>Link Status</label><input type="text" id="fm-link"></div>
+    <div class="fr"><label>Customer</label><input type="text" id="fm-cust"></div>
+    <div class="fr"><label>Job Type</label><input type="text" id="fm-job"></div>
+    <div class="fr"><label>Ticket</label><input type="text" id="fm-ticket"></div>
+    <div class="fr"><label>Stage</label>
+      <select id="fm-stage">
+        <option value="Survey">Survey</option>
+        <option value="Scheduling">Scheduling</option>
+        <option value="Build">Build</option>
+        <option value="Job Report Approvals">Job Report Approvals</option>
+        <option value="FF Approved">FF Approved</option>
+      </select></div>
+    <div class="fr"><label>Invoice Status</label>
+      <select id="fm-status">
+        <option value="">None</option>
+        <option value="toinvoice">To Invoice</option>
+        <option value="invoiced">Invoiced</option>
+        <option value="pending">Pending</option>
+      </select></div>
+    <div class="fr"><label>Amount (R)</label><input type="number" id="fm-amt" step="0.01"></div>
+    <div class="fr"><label>Notes</label><textarea id="fm-notes"></textarea></div>
+    <div class="mbtns">
+      <button class="btn btn-grey" id="fm-cancel-btn">Cancel</button>
+      <button class="btn btn-blue" id="fm-save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOD -->
+<div id="hod-ov">
+  <div id="hod-mdl">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="font-size:1.05rem;color:#3a3a5a">&#128202; HOD Report</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="hod-download-btn" class="btn btn-green" style="font-size:.78rem;padding:5px 12px">&#128202; Download Excel</button>
+        <button id="hod-close-btn" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#888">&times;</button>
+      </div>
+    </div>
+    <div id="hod-content"></div>
+  </div>
+</div>
+
+<!-- IMPORT MNT -->
+<div class="ov" id="imp-ov">
+  <div class="imp-mdl">
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+      <h2 style="font-size:1rem">&#128202; Import from Excel / CSV</h2>
+      <button id="imp-close-btn" style="background:none;border:none;font-size:1.3rem;cursor:pointer">&times;</button>
+    </div>
+    <p style="font-size:.82rem;color:#666;margin-bottom:10px">Column headers matched automatically.</p>
+    <input type="file" id="imp-file" accept=".xlsx,.xls,.csv">
+    <div class="imp-prev" id="imp-prev"></div>
+    <div id="imp-status" style="font-size:.82rem;margin:6px 0"></div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:10px">
+      <button class="btn btn-grey" id="imp-cancel-btn">Cancel</button>
+      <button class="btn btn-blue" id="imp-ok" style="display:none">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT FTTB -->
+<div class="ov" id="fttb-imp-ov">
+  <div class="imp-mdl">
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+      <h2 style="font-size:1rem">&#128202; Import FTTB from Excel / CSV</h2>
+      <button id="fttb-imp-close-btn" style="background:none;border:none;font-size:1.3rem;cursor:pointer">&times;</button>
+    </div>
+    <input type="file" id="fttb-imp-file" accept=".xlsx,.xls,.csv">
+    <div class="imp-prev" id="fttb-imp-prev"></div>
+    <div id="fttb-imp-status" style="font-size:.82rem;margin:6px 0"></div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:10px">
+      <button class="btn btn-grey" id="fttb-imp-cancel-btn">Cancel</button>
+      <button class="btn btn-blue" id="fttb-imp-ok" style="display:none">Import</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

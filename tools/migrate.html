@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>One-time data migration — Blitz MNT Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:'Segoe UI',Arial,sans-serif;max-width:900px;margin:24px auto;padding:0 20px;color:#333}
+h1{font-size:1.2rem;color:#3a3a5a}
+p{font-size:.85rem;color:#666;line-height:1.5}
+textarea{width:100%;height:160px;font-family:monospace;font-size:.78rem;padding:8px;border:1px solid #ddd;border-radius:6px}
+label{display:block;font-weight:600;margin:14px 0 4px;font-size:.85rem}
+button{padding:8px 16px;border-radius:6px;border:none;background:#6e8ab5;color:#fff;font-weight:600;cursor:pointer;margin-top:10px}
+button:disabled{opacity:.5;cursor:default}
+#log{white-space:pre-wrap;font-family:monospace;font-size:.78rem;background:#f3eff8;padding:12px;border-radius:6px;margin-top:16px;max-height:320px;overflow-y:auto}
+#signin{background:#fff8e0;padding:12px;border-radius:6px;margin-bottom:16px}
+#signin input{padding:6px 8px;margin-right:6px}
+.warn{background:#ffeeba;color:#856404;padding:8px 12px;border-radius:6px;font-size:.82rem;margin-bottom:14px}
+</style>
+</head>
+<body>
+<h1>One-time data migration &rarr; Supabase</h1>
+<div class="warn">Standalone tool, not linked from the main app. Delete this file once migration is verified complete.</div>
+<p>
+  In the OLD app's browser devtools console, run <code>copy(JSON.stringify(records))</code> and paste the
+  result into the first box below. Do the same with <code>copy(JSON.stringify(fttbRecords))</code> for the second box.
+  Dates are converted from dd/mm/yyyy to ISO automatically. Any record with an embedded base64 <code>pdf</code>
+  field is uploaded to Supabase Storage as part of the same pass.
+</p>
+
+<div id="signin">
+  <span id="signin-status">Checking session…</span>
+  <div id="signin-form" style="display:none;margin-top:8px">
+    <input type="email" id="si-email" placeholder="Email">
+    <input type="password" id="si-password" placeholder="Password">
+    <button id="si-btn" style="margin-top:0">Sign In</button>
+  </div>
+</div>
+
+<label>MNT records JSON (old <code>records</code> array)</label>
+<textarea id="mnt-json" placeholder="[{&quot;id&quot;:&quot;q0&quot;,&quot;date&quot;:&quot;30/04/2026&quot;,...}]"></textarea>
+
+<label>FTTB records JSON (old <code>fttbRecords</code> array)</label>
+<textarea id="fttb-json" placeholder="[{&quot;id&quot;:&quot;...&quot;,&quot;frgRef&quot;:&quot;...&quot;,...}]"></textarea>
+
+<button id="run-btn" disabled>Run Migration</button>
+<div id="log"></div>
+
+<script type="module">
+import { supabase } from '../js/supabaseClient.js';
+
+const logEl = document.getElementById('log');
+const runBtn = document.getElementById('run-btn');
+function log(msg) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+
+function toIsoDate(s) {
+  if (!s) return null;
+  const p = String(s).split('/');
+  if (p.length === 3) return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+  return s; // already ISO or unrecognized — pass through
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, b64] = dataUrl.split(',');
+  const mime = (meta.match(/data:(.*?);base64/) || [, 'application/pdf'])[1];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+async function migrateMnt(rows) {
+  let ok = 0, fail = 0;
+  for (const r of rows) {
+    const id = crypto.randomUUID();
+    const rec = {
+      id,
+      date: toIsoDate(r.date),
+      expiry: toIsoDate(r.expiry),
+      doc_no: r.docNo || '',
+      ref: r.ref || '',
+      amount: Number(r.amount) || 0,
+      rep: r.rep || '',
+      mnt_status: r.status || 'outstanding',
+      notes: r.notes || '',
+      pdf_path: null,
+      pdf_name: null,
+    };
+    try {
+      if (r.pdf && r.pdfName) {
+        const blob = dataUrlToBlob(r.pdf);
+        const path = `mnt/${id}/${Date.now()}-${r.pdfName}`;
+        const { error: upErr } = await supabase.storage.from('attachments').upload(path, blob, { contentType: blob.type });
+        if (upErr) throw upErr;
+        rec.pdf_path = path;
+        rec.pdf_name = r.pdfName;
+      }
+      const { error } = await supabase.from('mnt_records').insert(rec);
+      if (error) throw error;
+      ok++;
+      log(`OK  mnt ${rec.doc_no || id}`);
+    } catch (e) {
+      fail++;
+      log(`FAIL mnt ${r.docNo || id}: ${e.message}`);
+    }
+  }
+  log(`MNT migration done: ${ok} inserted, ${fail} failed.`);
+}
+
+async function migrateFttb(rows) {
+  let ok = 0, fail = 0;
+  for (const r of rows) {
+    const rec = {
+      id: crypto.randomUUID(),
+      frg_ref: r.frgRef || '',
+      link_status: r.linkStatus || '',
+      customer: r.customer || '',
+      job_type: r.jobType || '',
+      ticket: r.ticket || '',
+      stage: r.stage || 'Survey',
+      fttb_status: r.status || '',
+      amount: Number(r.amount) || 0,
+      notes: r.notes || '',
+    };
+    try {
+      const { error } = await supabase.from('fttb_records').insert(rec);
+      if (error) throw error;
+      ok++;
+      log(`OK  fttb ${rec.ticket || rec.id}`);
+    } catch (e) {
+      fail++;
+      log(`FAIL fttb ${r.ticket || ''}: ${e.message}`);
+    }
+  }
+  log(`FTTB migration done: ${ok} inserted, ${fail} failed.`);
+}
+
+runBtn.addEventListener('click', async () => {
+  runBtn.disabled = true;
+  logEl.textContent = '';
+  try {
+    const mntRaw = document.getElementById('mnt-json').value.trim();
+    const fttbRaw = document.getElementById('fttb-json').value.trim();
+    const mntRows = mntRaw ? JSON.parse(mntRaw) : [];
+    const fttbRows = fttbRaw ? JSON.parse(fttbRaw) : [];
+    log(`Starting migration: ${mntRows.length} MNT rows, ${fttbRows.length} FTTB rows.`);
+    if (mntRows.length) await migrateMnt(mntRows);
+    if (fttbRows.length) await migrateFttb(fttbRows);
+    log('Migration complete.');
+  } catch (e) {
+    log('Error: ' + e.message);
+  } finally {
+    runBtn.disabled = false;
+  }
+});
+
+const signinStatus = document.getElementById('signin-status');
+const signinForm = document.getElementById('signin-form');
+document.getElementById('si-btn').addEventListener('click', async () => {
+  const email = document.getElementById('si-email').value.trim();
+  const password = document.getElementById('si-password').value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) signinStatus.textContent = 'Sign-in failed: ' + error.message;
+});
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    signinStatus.textContent = 'Signed in as ' + session.user.email;
+    signinForm.style.display = 'none';
+    runBtn.disabled = false;
+  } else {
+    signinStatus.textContent = 'Not signed in — sign in with a team account to run the migration (RLS requires it).';
+    signinForm.style.display = 'block';
+    runBtn.disabled = true;
+  }
+});
+</script>
+</body>
+</html>
