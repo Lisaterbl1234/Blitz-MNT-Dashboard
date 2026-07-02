@@ -13,18 +13,36 @@ const MNT_AL = {
   notes: ['notes', 'note', 'comment', 'remarks'],
 };
 const FTTB_AL = {
-  frg_ref: ['frg ref', 'frg reference', 'frgref', 'frg', 'ref'],
+  frg_ref: ['frg ref', 'frg reference', 'frgref', 'frg', 'ref', 'link label'],
   link_status: ['link status', 'link', 'connection'],
-  customer: ['customer', 'client', 'company', 'name'],
-  job_type: ['job type', 'jobtype', 'type', 'job'],
+  customer: ['customer', 'client', 'company', 'name', 'link site'],
+  job_type: ['job type', 'jobtype', 'type', 'job', 'sow type'],
   ticket: ['ticket', 'ticket no', 'ticket number'],
-  stage: ['stage', 'step', 'phase'],
-  notes: ['notes', 'note', 'comment'],
+  stage: ['stage', 'phase', 'ticket step'],
+  notes: ['notes', 'note', 'comment', 'comments', 'general comments & feedback', 'general comments and feedback', 'feedback'],
   fttb_status: ['status', 'invoice status'],
   amount: ['amount', 'value', 'price', 'total'],
 };
 
 const DATE_FIELDS = new Set(['date', 'expiry']);
+
+// Real-world exports often have title/report-metadata rows above the actual
+// header row (e.g. "FTTB Jobs Exporter Data as of: ..."). Scan the first few
+// rows and pick whichever one matches the most known column aliases, rather
+// than assuming the header is always row 1.
+function findHeaderRowIndex(rows, al) {
+  const allAliases = new Set();
+  Object.values(al).forEach(list => list.forEach(a => allAliases.add(a)));
+  let bestIdx = 0;
+  let bestScore = -1;
+  const scanLimit = Math.min(rows.length, 20);
+  for (let i = 0; i < scanLimit; i++) {
+    const hdrs = rows[i].map(h => String(h).toLowerCase().trim());
+    const score = hdrs.filter(h => allAliases.has(h)).length;
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  return bestScore > 0 ? bestIdx : 0;
+}
 
 export function openImport() {
   document.getElementById('imp-ov').classList.add('open');
@@ -53,15 +71,16 @@ export function handleImport(inputEl, type) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
       if (rows.length < 2) { alert('File empty'); return; }
-      const hdrs = rows[0].map(h => String(h).toLowerCase().trim());
       const al = type === 'mnt' ? MNT_AL : FTTB_AL;
+      const headerIdx = findHeaderRowIndex(rows, al);
+      const hdrs = rows[headerIdx].map(h => String(h).toLowerCase().trim());
       const cm = {};
       Object.keys(al).forEach((field) => {
         al[field].forEach((n) => {
           if (cm[field] === undefined) { const i = hdrs.indexOf(n); if (i >= 0) cm[field] = i; }
         });
       });
-      const parsed = rows.slice(1).filter(r => r.some(c => c !== '')).map((r) => {
+      const parsed = rows.slice(headerIdx + 1).filter(r => r.some(c => c !== '')).map((r) => {
         const obj = {};
         Object.keys(cm).forEach((field) => {
           let val = String(r[cm[field]] || '').trim();

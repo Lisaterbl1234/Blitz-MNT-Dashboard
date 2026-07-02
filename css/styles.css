@@ -81,4 +81,9 @@ select.ssel{padding:3px 6px;border:1px solid #ddd;border-radius:6px;font-size:.7
 .login-card button{width:100%;padding:10px;margin-top:6px}
 #login-msg{font-size:.8rem;min-height:18px;margin-top:10px}
 #login-msg.err{color:#c0392b}
+#login-msg.ok{color:#2a7a2a}
+.login-toggle{font-size:.8rem;text-align:center;margin-top:8px}
+.login-toggle a{color:#6e8ab5;text-decoration:none;font-weight:600}
+.login-toggle a:hover{text-decoration:underline}
 #app.hidden{display:none}
+.hidden{display:none}

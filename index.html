@@ -20,7 +20,13 @@
       <div class="fr"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" required></div>
       <button type="submit" class="btn btn-blue">Sign In</button>
     </form>
+    <form id="signup-form" class="hidden">
+      <div class="fr"><label>Email</label><input type="email" id="signup-email" autocomplete="username" required></div>
+      <div class="fr"><label>Password</label><input type="password" id="signup-password" autocomplete="new-password" required minlength="6"></div>
+      <button type="submit" class="btn btn-blue">Create Account</button>
+    </form>
     <div id="login-msg"></div>
+    <p class="login-toggle"><a href="#" id="toggle-auth-mode">Need an account? Sign Up</a></p>
   </div>
 </div>
 
@@ -100,6 +106,7 @@
       <option value="Build">Build</option>
       <option value="Job Report Approvals">Job Report Approvals</option>
       <option value="FF Approved">FF Approved</option>
+      <option value="Permissions">Permissions</option>
     </select>
     <select id="fttb-fil-status">
       <option value="">All Invoice Status</option>
@@ -166,6 +173,7 @@
         <option value="Build">Build</option>
         <option value="Job Report Approvals">Job Report Approvals</option>
         <option value="FF Approved">FF Approved</option>
+        <option value="Permissions">Permissions</option>
       </select></div>
     <div class="fr"><label>Invoice Status</label>
       <select id="fm-status">

@@ -35,7 +35,7 @@ create table if not exists fttb_records (
   job_type text,
   ticket text,
   stage text
-    check (stage in ('Survey','Scheduling','Build','Job Report Approvals','FF Approved')),
+    check (stage in ('Survey','Scheduling','Build','Job Report Approvals','FF Approved','Permissions')),
   fttb_status text not null default ''
     check (fttb_status in ('','toinvoice','invoiced','pending')),
   amount numeric(12,2) not null default 0,

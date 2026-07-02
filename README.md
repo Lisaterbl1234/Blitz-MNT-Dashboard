@@ -1,8 +1,13 @@
 # Blitz MNT / FTTB Dashboard
 
 Live, multi-user quote/PO and FTTB patching tracker. Plain HTML/CSS/JS (no build step, no npm) backed by
-Supabase (Postgres + Auth + Storage + Realtime). Anyone with a team login can view and edit; edits show up
-live for everyone else without full-page reloads.
+Supabase (Postgres + Auth + Storage + Realtime). Anyone can create an account and sign in to view and edit;
+edits show up live for everyone else without full-page reloads.
+
+**Access model note**: signup is open — anyone with the link can create an account (this was a deliberate
+choice, not an oversight). Row Level Security only gates *unauthenticated* access; once someone has any
+account, they have full read/write access to all quotes, POs, customer refs, amounts, and PDFs. There's no
+per-user restriction layer. Worth revisiting if this ever holds data that shouldn't be that widely visible.
 
 This is a from-scratch rebuild — it has **zero dependency on the old Firebase-based version**. The old file
 keeps running independently on its own Firebase project until this app is fully validated; the two never
@@ -25,12 +30,16 @@ share a URL, database, or code.
 4. (Optional, recommended) New query again → paste [`supabase/seed_mnt.sql`](supabase/seed_mnt.sql) → Run.
    This loads the ~74 historical MNT quote/PO rows.
 
-## 3. Lock down auth
+## 3. Auth settings
 
-1. **Authentication → Providers → Email** → confirm "Allow new users to sign up" is **disabled**. This is
-   what makes it a closed, shared-login app instead of open registration.
-2. **Authentication → Users → Add user** → create an account for each team member (or one shared login, if
-   preferred) with an email + password. No invite-email flow needed since signup is off.
+**Authentication → Sign In / Providers → Supabase Auth**, under **User Signups**:
+
+- **"Allow new users to sign up"** — **on**. This app uses open self-signup — anyone with the link can
+  create their own account via the Sign Up link on the login screen.
+- **"Confirm email"** — **on**. New users get a confirmation email after signing up and must click the
+  link in it before they can sign in (the app shows "check your email to confirm your account" in this
+  case). This is the safer default and is what's currently configured.
+3. Optionally, **Authentication → Users → Add user** to pre-create specific accounts yourself.
 
 ## 4. Wire up the app
 
