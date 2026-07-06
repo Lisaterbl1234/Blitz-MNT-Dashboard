@@ -37,8 +37,10 @@ tr.cancelled{background:#fde8f2}
   Matches each invoice row against live <code>mnt_records</code> using the customer job/ticket number
   (the digits before the FRG reference) plus an exact amount match. Only rows with exactly one confident
   match are auto-selected. Nothing is written until you review the preview and click "Apply Selected
-  Updates" &mdash; applying sets status to <b>Invoiced</b> and appends the invoice/PO numbers to the notes
-  field (existing notes are preserved, never overwritten).
+  Updates" &mdash; for a <b>matched</b> row this sets status to <b>Invoiced</b> and appends the invoice/PO
+  numbers to the notes field (existing notes are preserved, never overwritten); for an <b>unmatched</b> row
+  (no record found on the dashboard at all) this creates a brand-new record already marked Invoiced with
+  the PO/invoice numbers in its notes, since that invoice has no matching PO/quote row otherwise.
 </p>
 
 <div id="signin">
@@ -66,76 +68,78 @@ function log(msg) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scr
 
 // Parsed from the June 2026 invoice register image. Sum verified to equal the
 // stated "Movement for the period" total of R82,177.05 across all 68 rows.
+// date is the invoice date (ISO) — used as a fallback "Date" only for rows
+// that need a brand-new record created (no matching PO/quote row exists).
 const INVOICES = [
-  ['IN109154','PO-FF046596','3674199 - FRG-NT-130569',1535.25],
-  ['IN109155','PO-FF046597','3656698 - FRG12357025-JHB-B1',575.00],
-  ['IN109156','PO-FF046598','3693104 - FRG-BT-1615384',575.00],
-  ['IN109177','PO-FF046884','3766730- FRG6366900-JHB-B1',797.96],
-  ['IN109178','PO-FF046885','3755438-FRG10011666-JHB-B1',707.25],
-  ['IN109179','PO-FF046886','3717037-FRG13006241-JHB-B1',808.63],
-  ['IN109180','PO-FF046887','3733863-FRG12975866-JHB-B1',716.63],
-  ['IN109181','PO-FF046888','3727950-FRG13060871-JHB-B1',707.25],
-  ['IN109182','PO-FF046889','3721254 - FRG13007827-JHB-B1',707.25],
-  ['IN109183','PO-FF046890','3708210 - FRG9636611-JHB-B1',707.25],
-  ['IN109184','PO-FF046891','3709189 - FRG10011073-JHB-B1',700.63],
-  ['IN109185','PO-FF046892','3702194 - FRG12618741-JHB-B1',575.00],
-  ['IN109186','PO-FF046893','3696428 - FRG1520959-JHB-B1',1725.00],
-  ['IN109187','PO-FF046871','3632801 - FRG12207908-PLZ-B1',1667.50],
-  ['IN109188','PO-FF046872','3732084-FRG12870418-JHB-B1',707.25],
-  ['IN109189','PO-FF046873','3664719 - FRG11342081-JHB-B1',707.25],
-  ['IN109190','PO-FF046874','3767074-FRG10011618-JHB-B1',615.25],
-  ['IN109191','PO-FF046875','3758958 - FRG4929568-JHB-B1',575.00],
-  ['IN109192','PO-FF046960','3734420-FRG13063620-JHB-B1',707.25],
-  ['IN109193','PO-FF046961','3740156 - FRG10011153-JHB-B1',1214.03],
-  ['IN109210','PO-FF046992','3006174 - FRG9380731-PLZ-B1',2110.25],
-  ['IN109211','PO-FF046978','3740278 - FRG12733375-JHB-B1',1725.00],
-  ['IN109212','PO-FF046979','3713227-FRG6366894-JHB-B1',707.25],
-  ['IN109213','PO-FF047024','3713343 - FRG12537685-JHB-B1',575.00],
-  ['IN109214','PO-FF047025','3717166 -FRG13121678-JHB-B1',707.25],
-  ['IN109215','PO-FF047026','3718659-FRG12935763-JHB-B1',700.63],
-  ['IN109229','PO-FF046845','3774021-FRG13318655-PLZ-B1',1380.00],
-  ['IN109230','PO-FF046847','3771264- FRG1365956-PLZ-B1',1725.00],
-  ['IN109231','PO-FF046848','3780081-FRG6094581-JHB-B1',707.25],
-  ['IN109232','PO-FF046836','3729371 - Infrastructure Relocation - FRG1127796-PLZ-B1',4519.50],
-  ['IN109233','PO-FF046711','3736567 -FRG4884747-JHB-B1',1481.38],
-  ['IN109234','PO-FF046854','3735935 - FRG4435853-JHB-B1',1640.91],
-  ['IN109235','PO-FF046855','3798774-FRG12870834-JHB-B1',620.59],
-  ['IN109236','PO-FF046856','3791768 - FRG3204822-JHB-B1',1725.00],
-  ['IN109237','PO-FF046857','3791184-FRG8545330-JHB-B1',707.25],
-  ['IN109238','PO-FF046861','3787953-FRG12971757-JHB-B1',707.25],
-  ['IN109239','PO-FF046862','3769613 - FRG3918821-JHB-B1',2656.50],
-  ['IN109240','PO-FF046863','3786223 - FRG7422975-BFN-B1',1725.00],
-  ['IN109241','PO-FF046864','3784562 - FRG13208157-JHB-B1',707.25],
-  ['IN109242','PO-FF046953','3792733-FRG12008099-JHB-B1',927.31],
-  ['IN109243','PO-FF046959','3802779-FRG13403411-JHB-B1',615.25],
-  ['IN109244','PO-FF046926','3806758-FRG4901661-JHB-B1',636.59],
-  ['IN109245','PO-FF047005','3811884- FRG13228154-JHB-B1',802.01],
-  ['IN109246','PO-FF047008','3801931-FRG13525373-PLZ-B1',2915.25],
-  ['IN109247','PO-FF047009','3791697-FRG897190-PLZ-B1',1725.00],
-  ['IN109248','PO-FF047019','3818273 - FRG12024194-JHB-B1',1272.73],
-  ['IN109249','PO-FF047020','3814696 - FRG11401519-JHB-B1',707.25],
-  ['IN109250','PO-FF047021','3811390- FRG13631876-JHB-B1',829.98],
-  ['IN109251','PO-FF047087','3832469-FRG13386846-JHB-B1',769.99],
-  ['IN109252','PO-FF047086','3813152- FRG12655081-JHB-B1',575.00],
-  ['IN109253','PO-FF046849','3769207 - FRG617070-PLZ-B1',1725.00],
-  ['IN109254','PO-FF046850','3774842-FRG13096878-JHB-B1',861.99],
-  ['IN109255','PO-FF046851','3769033-FRG4882621-JHB-B1',615.25],
-  ['IN109256','PO-FF046852','3768406-FRG12572554-JHB-B1',856.66],
-  ['IN109257','PO-FF046853','3757142 - FRG13336561-JHB-B1',575.00],
-  ['IN109258','PO-FF047034','3704954 - FRG12346846 - JHB1-B1',705.96],
-  ['IN109263','PO-FF047246','3787353 - FRG12247881-JHB-B1',1972.94],
-  ['IN109265','PO-FF047253','3805430-FRG6366709-JHB-B1',707.25],
-  ['IN109266','PO-FF047248','3801792-FRG12851679-PLZ-B1',2691.00],
-  ['IN109267','PO-FF047216','3841286-FRG4884907-JHB-B1',707.25],
-  ['IN109268','PO-FF047219','3853103-FRG12024194-JHB-B1',707.25],
-  ['IN109269','PO-FF047220','3846266 - FRG-NT-49459',7475.00],
-  ['IN109270','PO-FF047221','3844539-FRG4911881-JHB-B1',615.25],
-  ['IN109271','PO-FF047222','3843784 - FRG12620438-JHB-B1',575.00],
-  ['IN109272','PO-FF047228','3828099-FRG1289178-PLZ-B1',1725.00],
-  ['IN109273','PO-FF047229','3830656-FRG702210-PLZ-B1',1725.00],
-  ['IN109274','PO-FF047230','3839823-FRG-NT-108033',575.00],
-  ['IN109275','PO-FF047243','3850031 - FRG646329-PLZ-B1',1725.00],
-].map(([inv, po, ref, amount]) => ({ inv, po, ref, amount }));
+  ['2026-06-09','IN109154','PO-FF046596','3674199 - FRG-NT-130569',1535.25],
+  ['2026-06-10','IN109155','PO-FF046597','3656698 - FRG12357025-JHB-B1',575.00],
+  ['2026-06-10','IN109156','PO-FF046598','3693104 - FRG-BT-1615384',575.00],
+  ['2026-06-19','IN109177','PO-FF046884','3766730- FRG6366900-JHB-B1',797.96],
+  ['2026-06-19','IN109178','PO-FF046885','3755438-FRG10011666-JHB-B1',707.25],
+  ['2026-06-19','IN109179','PO-FF046886','3717037-FRG13006241-JHB-B1',808.63],
+  ['2026-06-19','IN109180','PO-FF046887','3733863-FRG12975866-JHB-B1',716.63],
+  ['2026-06-19','IN109181','PO-FF046888','3727950-FRG13060871-JHB-B1',707.25],
+  ['2026-06-19','IN109182','PO-FF046889','3721254 - FRG13007827-JHB-B1',707.25],
+  ['2026-06-19','IN109183','PO-FF046890','3708210 - FRG9636611-JHB-B1',707.25],
+  ['2026-06-19','IN109184','PO-FF046891','3709189 - FRG10011073-JHB-B1',700.63],
+  ['2026-06-19','IN109185','PO-FF046892','3702194 - FRG12618741-JHB-B1',575.00],
+  ['2026-06-19','IN109186','PO-FF046893','3696428 - FRG1520959-JHB-B1',1725.00],
+  ['2026-06-19','IN109187','PO-FF046871','3632801 - FRG12207908-PLZ-B1',1667.50],
+  ['2026-06-19','IN109188','PO-FF046872','3732084-FRG12870418-JHB-B1',707.25],
+  ['2026-06-19','IN109189','PO-FF046873','3664719 - FRG11342081-JHB-B1',707.25],
+  ['2026-06-19','IN109190','PO-FF046874','3767074-FRG10011618-JHB-B1',615.25],
+  ['2026-06-19','IN109191','PO-FF046875','3758958 - FRG4929568-JHB-B1',575.00],
+  ['2026-06-19','IN109192','PO-FF046960','3734420-FRG13063620-JHB-B1',707.25],
+  ['2026-06-19','IN109193','PO-FF046961','3740156 - FRG10011153-JHB-B1',1214.03],
+  ['2026-06-23','IN109210','PO-FF046992','3006174 - FRG9380731-PLZ-B1',2110.25],
+  ['2026-06-23','IN109211','PO-FF046978','3740278 - FRG12733375-JHB-B1',1725.00],
+  ['2026-06-23','IN109212','PO-FF046979','3713227-FRG6366894-JHB-B1',707.25],
+  ['2026-06-24','IN109213','PO-FF047024','3713343 - FRG12537685-JHB-B1',575.00],
+  ['2026-06-24','IN109214','PO-FF047025','3717166 -FRG13121678-JHB-B1',707.25],
+  ['2026-06-24','IN109215','PO-FF047026','3718659-FRG12935763-JHB-B1',700.63],
+  ['2026-06-29','IN109229','PO-FF046845','3774021-FRG13318655-PLZ-B1',1380.00],
+  ['2026-06-29','IN109230','PO-FF046847','3771264- FRG1365956-PLZ-B1',1725.00],
+  ['2026-06-29','IN109231','PO-FF046848','3780081-FRG6094581-JHB-B1',707.25],
+  ['2026-06-29','IN109232','PO-FF046836','3729371 - Infrastructure Relocation - FRG1127796-PLZ-B1',4519.50],
+  ['2026-06-29','IN109233','PO-FF046711','3736567 -FRG4884747-JHB-B1',1481.38],
+  ['2026-06-29','IN109234','PO-FF046854','3735935 - FRG4435853-JHB-B1',1640.91],
+  ['2026-06-29','IN109235','PO-FF046855','3798774-FRG12870834-JHB-B1',620.59],
+  ['2026-06-29','IN109236','PO-FF046856','3791768 - FRG3204822-JHB-B1',1725.00],
+  ['2026-06-29','IN109237','PO-FF046857','3791184-FRG8545330-JHB-B1',707.25],
+  ['2026-06-29','IN109238','PO-FF046861','3787953-FRG12971757-JHB-B1',707.25],
+  ['2026-06-29','IN109239','PO-FF046862','3769613 - FRG3918821-JHB-B1',2656.50],
+  ['2026-06-29','IN109240','PO-FF046863','3786223 - FRG7422975-BFN-B1',1725.00],
+  ['2026-06-29','IN109241','PO-FF046864','3784562 - FRG13208157-JHB-B1',707.25],
+  ['2026-06-29','IN109242','PO-FF046953','3792733-FRG12008099-JHB-B1',927.31],
+  ['2026-06-29','IN109243','PO-FF046959','3802779-FRG13403411-JHB-B1',615.25],
+  ['2026-06-29','IN109244','PO-FF046926','3806758-FRG4901661-JHB-B1',636.59],
+  ['2026-06-29','IN109245','PO-FF047005','3811884- FRG13228154-JHB-B1',802.01],
+  ['2026-06-29','IN109246','PO-FF047008','3801931-FRG13525373-PLZ-B1',2915.25],
+  ['2026-06-29','IN109247','PO-FF047009','3791697-FRG897190-PLZ-B1',1725.00],
+  ['2026-06-29','IN109248','PO-FF047019','3818273 - FRG12024194-JHB-B1',1272.73],
+  ['2026-06-29','IN109249','PO-FF047020','3814696 - FRG11401519-JHB-B1',707.25],
+  ['2026-06-29','IN109250','PO-FF047021','3811390- FRG13631876-JHB-B1',829.98],
+  ['2026-06-29','IN109251','PO-FF047087','3832469-FRG13386846-JHB-B1',769.99],
+  ['2026-06-29','IN109252','PO-FF047086','3813152- FRG12655081-JHB-B1',575.00],
+  ['2026-06-29','IN109253','PO-FF046849','3769207 - FRG617070-PLZ-B1',1725.00],
+  ['2026-06-29','IN109254','PO-FF046850','3774842-FRG13096878-JHB-B1',861.99],
+  ['2026-06-29','IN109255','PO-FF046851','3769033-FRG4882621-JHB-B1',615.25],
+  ['2026-06-29','IN109256','PO-FF046852','3768406-FRG12572554-JHB-B1',856.66],
+  ['2026-06-29','IN109257','PO-FF046853','3757142 - FRG13336561-JHB-B1',575.00],
+  ['2026-06-30','IN109258','PO-FF047034','3704954 - FRG12346846 - JHB1-B1',705.96],
+  ['2026-06-30','IN109263','PO-FF047246','3787353 - FRG12247881-JHB-B1',1972.94],
+  ['2026-06-30','IN109265','PO-FF047253','3805430-FRG6366709-JHB-B1',707.25],
+  ['2026-06-30','IN109266','PO-FF047248','3801792-FRG12851679-PLZ-B1',2691.00],
+  ['2026-06-30','IN109267','PO-FF047216','3841286-FRG4884907-JHB-B1',707.25],
+  ['2026-06-30','IN109268','PO-FF047219','3853103-FRG12024194-JHB-B1',707.25],
+  ['2026-06-30','IN109269','PO-FF047220','3846266 - FRG-NT-49459',7475.00],
+  ['2026-06-30','IN109270','PO-FF047221','3844539-FRG4911881-JHB-B1',615.25],
+  ['2026-06-30','IN109271','PO-FF047222','3843784 - FRG12620438-JHB-B1',575.00],
+  ['2026-06-30','IN109272','PO-FF047228','3828099-FRG1289178-PLZ-B1',1725.00],
+  ['2026-06-30','IN109273','PO-FF047229','3830656-FRG702210-PLZ-B1',1725.00],
+  ['2026-06-30','IN109274','PO-FF047230','3839823-FRG-NT-108033',575.00],
+  ['2026-06-30','IN109275','PO-FF047243','3850031 - FRG646329-PLZ-B1',1725.00],
+].map(([date, inv, po, ref, amount]) => ({ date, inv, po, ref, amount }));
 
 function ticketNo(ref) {
   const m = String(ref || '').match(/^\s*(\d+)/);
@@ -172,7 +176,7 @@ async function loadAndMatch() {
     }
     const token = `IN${invc.inv.replace(/^IN/i, '')} | ${invc.po}`;
     if (candidates.length === 0) {
-      return { invc, status: 'unmatched', record: null };
+      return { invc, status: 'unmatched', record: null, newNotes: token };
     }
     if (candidates.length > 1) {
       return { invc, status: 'ambiguous', record: null, candidates };
@@ -191,18 +195,20 @@ async function loadAndMatch() {
 
   renderPreview();
   const counts = rows.reduce((a, r) => { a[r.status] = (a[r.status] || 0) + 1; return a; }, {});
-  log(`Matched: ${counts.matched || 0}  No-change: ${counts.nochange || 0}  Cancelled(skip): ${counts.cancelled || 0}  Ambiguous: ${counts.ambiguous || 0}  Unmatched: ${counts.unmatched || 0}`);
+  log(`Matched (update): ${counts.matched || 0}  Unmatched (new record): ${counts.unmatched || 0}  No-change: ${counts.nochange || 0}  Cancelled(skip): ${counts.cancelled || 0}  Ambiguous: ${counts.ambiguous || 0}`);
   matchBtn.disabled = false;
-  applyBtn.disabled = !(counts.matched > 0);
+  applyBtn.disabled = !(counts.matched > 0 || counts.unmatched > 0);
 }
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+const ACTION_LABEL = { matched: 'Update existing', unmatched: 'Insert new record', nochange: 'No change', cancelled: 'Skip (cancelled)', ambiguous: 'Skip (ambiguous)' };
+
 function renderPreview() {
   let html = '<table><thead><tr><th></th><th>Invoice</th><th>PO</th><th>Ref</th><th>Amount</th>' +
-    '<th>Existing Doc No</th><th>Current Status</th><th>New Notes</th><th>Status</th></tr></thead><tbody>';
+    '<th>Existing Doc No</th><th>Current Status</th><th>New Notes</th><th>Action</th></tr></thead><tbody>';
   rows.forEach((r, i) => {
-    const checkable = r.status === 'matched';
+    const checkable = r.status === 'matched' || r.status === 'unmatched';
     const checked = checkable ? 'checked' : '';
     const disabled = checkable ? '' : 'disabled';
     html += `<tr class="${r.status}">` +
@@ -212,7 +218,7 @@ function renderPreview() {
       `<td>${esc(r.record ? r.record.doc_no : (r.candidates ? r.candidates.map(c => c.doc_no).join(', ') : ''))}</td>` +
       `<td>${esc(r.record ? r.record.mnt_status : '')}</td>` +
       `<td>${esc(r.newNotes || '')}</td>` +
-      `<td><span class="tag ${r.status}">${r.status}</span></td>` +
+      `<td><span class="tag ${r.status}">${ACTION_LABEL[r.status]}</span></td>` +
       '</tr>';
   });
   html += '</tbody></table>';
@@ -224,18 +230,27 @@ matchBtn.addEventListener('click', loadAndMatch);
 applyBtn.addEventListener('click', async () => {
   applyBtn.disabled = true;
   const checks = previewEl.querySelectorAll('input[type=checkbox]:checked');
-  log(`\nApplying ${checks.length} updates...`);
+  log(`\nApplying ${checks.length} changes...`);
   let ok = 0, fail = 0;
   for (const cb of checks) {
     const r = rows[Number(cb.dataset.i)];
-    if (r.status !== 'matched') continue;
-    const { error } = await supabase.from('mnt_records')
-      .update({ mnt_status: 'invoice', notes: r.newNotes })
-      .eq('id', r.record.id);
-    if (error) { fail++; log(`FAIL ${r.invc.inv} (doc ${r.record.doc_no}): ${error.message}`); }
-    else { ok++; log(`OK   ${r.invc.inv} -> doc ${r.record.doc_no} set to Invoiced`); }
+    if (r.status === 'matched') {
+      const { error } = await supabase.from('mnt_records')
+        .update({ mnt_status: 'invoice', notes: r.newNotes })
+        .eq('id', r.record.id);
+      if (error) { fail++; log(`FAIL update ${r.invc.inv} (doc ${r.record.doc_no}): ${error.message}`); }
+      else { ok++; log(`OK   update ${r.invc.inv} -> doc ${r.record.doc_no} set to Invoiced`); }
+    } else if (r.status === 'unmatched') {
+      const rec = {
+        date: r.invc.date, expiry: null, doc_no: r.invc.po, ref: r.invc.ref,
+        amount: r.invc.amount, rep: '', mnt_status: 'invoice', notes: r.newNotes,
+      };
+      const { error } = await supabase.from('mnt_records').insert(rec);
+      if (error) { fail++; log(`FAIL insert ${r.invc.inv} (${r.invc.po}): ${error.message}`); }
+      else { ok++; log(`OK   insert ${r.invc.inv} -> new record ${r.invc.po} created as Invoiced`); }
+    }
   }
-  log(`Done: ${ok} updated, ${fail} failed.`);
+  log(`Done: ${ok} applied, ${fail} failed.`);
   applyBtn.disabled = false;
 });
 
