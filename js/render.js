@@ -4,6 +4,12 @@ import { pd, fd, fa, esc } from './helpers.js';
 /* ====== SHARED ====== */
 function es(r) { return r.mnt_status || 'outstanding'; }
 
+/* Notes look like "IN108996 | PO-FF046597" */
+const PO_RE = /\bPO[-\s][A-Za-z0-9]+/i;
+const INV_RE = /\bINV?[-\s]?\d+/i;
+function hasPO(notes) { return PO_RE.test(notes || ''); }
+function hasInvoice(notes) { return INV_RE.test(notes || ''); }
+
 /* ====== SORT / FILTER (MNT) ====== */
 export function sortBy(col) {
   if (state.sortCol === col) state.sortAsc = !state.sortAsc;
@@ -28,6 +34,7 @@ function getFiltered() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   const st = document.getElementById('fil-status').value;
   const rep = document.getElementById('fil-rep').value;
+  const poinv = document.getElementById('fil-poinv').value;
   const mo = document.getElementById('fil-month').value;
   const dtField = document.getElementById('fil-dt').value || 'date';
   const df = document.getElementById('d-from').value;
@@ -35,6 +42,10 @@ function getFiltered() {
   return getSorted().filter((r) => {
     if (st && es(r) !== st) return false;
     if (rep && r.rep !== rep) return false;
+    if (poinv === 'has-po' && !hasPO(r.notes)) return false;
+    if (poinv === 'no-po' && hasPO(r.notes)) return false;
+    if (poinv === 'has-inv' && !hasInvoice(r.notes)) return false;
+    if (poinv === 'no-inv' && hasInvoice(r.notes)) return false;
     const ds = r[dtField] || '';
     if (mo) { const d = pd(ds); if (!d || String(d.getMonth() + 1).padStart(2, '0') !== mo) return false; }
     if (df) { const d = pd(ds); if (!d || d < new Date(df)) return false; }

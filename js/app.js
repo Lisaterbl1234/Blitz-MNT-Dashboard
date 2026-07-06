@@ -55,7 +55,7 @@ function wireEvents() {
 
   // MNT toolbar
   document.getElementById('search').addEventListener('input', renderTable);
-  ['fil-status', 'fil-rep', 'fil-month', 'fil-dt', 'd-from', 'd-to'].forEach(id =>
+  ['fil-status', 'fil-rep', 'fil-poinv', 'fil-month', 'fil-dt', 'd-from', 'd-to'].forEach(id =>
     document.getElementById(id).addEventListener('change', renderTable));
   document.getElementById('clear-dates-btn').addEventListener('click', clearDates);
   document.getElementById('add-mnt-btn').addEventListener('click', openAddModal);
