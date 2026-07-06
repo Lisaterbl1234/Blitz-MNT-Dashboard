@@ -196,6 +196,10 @@ async function loadAndMatch() {
   renderPreview();
   const counts = rows.reduce((a, r) => { a[r.status] = (a[r.status] || 0) + 1; return a; }, {});
   log(`Matched (update): ${counts.matched || 0}  Unmatched (new record): ${counts.unmatched || 0}  No-change: ${counts.nochange || 0}  Cancelled(skip): ${counts.cancelled || 0}  Ambiguous: ${counts.ambiguous || 0}`);
+  rows.filter(r => r.status === 'ambiguous').forEach(r =>
+    log(`  AMBIGUOUS ${r.invc.inv} (${r.invc.po}) ref="${r.invc.ref}" R${r.invc.amount.toFixed(2)} -> candidates: ${r.candidates.map(c => `${c.doc_no} [${c.mnt_status}]`).join(', ')}`));
+  rows.filter(r => r.status === 'cancelled').forEach(r =>
+    log(`  CANCELLED-MATCH ${r.invc.inv} (${r.invc.po}) -> doc ${r.record.doc_no} is Cancelled, skipped`));
   matchBtn.disabled = false;
   applyBtn.disabled = !(counts.matched > 0 || counts.unmatched > 0);
 }
