@@ -83,6 +83,8 @@
         <th data-sort="expiry">Expiry &#8597;</th>
         <th data-sort="docNo">Doc No &#8597;</th>
         <th>Customer Ref</th>
+        <th>PO No</th>
+        <th>Invoice No</th>
         <th data-sort="amount">Amount &#8597;</th>
         <th data-sort="rep">Sales Rep &#8597;</th>
         <th>Status</th>
@@ -147,8 +149,16 @@
         <option value="cancelled">Cancelled</option>
       </select></div>
     <div class="fr"><label>Notes</label><textarea id="m-notes"></textarea></div>
-    <div class="fr"><label>Attach PDF</label><input type="file" id="m-pdf" accept=".pdf"></div>
+
+    <h3 style="font-size:.85rem;color:#3a3a5a;margin:18px 0 10px;border-top:1px solid #eee;padding-top:14px">PO Number &amp; Invoice Tracking</h3>
+    <div class="fr"><label>PO Number</label><input type="text" id="m-po-number" placeholder="PO-FF046597"></div>
+    <div class="fr"><label>Attach PO PDF</label><input type="file" id="m-po-pdf" accept=".pdf"></div>
+    <div id="m-po-pdf-cur" style="font-size:.78rem;color:#888;margin-top:3px"></div>
+    <div class="fr"><label>Invoice Number</label><input type="text" id="m-invoice-number" placeholder="IN108996"></div>
+    <div class="fr"><label>Attach Invoice PDF</label><input type="file" id="m-pdf" accept=".pdf"></div>
     <div id="m-pdf-cur" style="font-size:.78rem;color:#888;margin-top:3px"></div>
+    <p style="font-size:.72rem;color:#999;margin-top:-4px">Attaching a PDF auto-fills the PO/Invoice numbers above from its text, when found.</p>
+
     <div class="mbtns">
       <button class="btn btn-grey" id="m-cancel-btn">Cancel</button>
       <button class="btn btn-blue" id="m-save-btn">Save</button>

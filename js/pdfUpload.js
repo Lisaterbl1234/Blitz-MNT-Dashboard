@@ -9,11 +9,15 @@ export function checkPdfSize(file) {
 
 // Uploads before any DB row is touched — caller aborts the save on failure
 // so there's never a row pointing at a missing file.
-export async function uploadPdf(recordId, file) {
-  const path = `mnt/${recordId}/${Date.now()}-${file.name}`;
+// tag='po' uses a separate storage path + column pair, so a record can carry
+// both a PO document and an Invoice document side by side.
+export async function uploadPdf(recordId, file, tag = '') {
+  const path = `mnt/${recordId}/${tag ? tag + '-' : ''}${Date.now()}-${file.name}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;
-  return { pdf_path: path, pdf_name: file.name };
+  return tag === 'po'
+    ? { po_pdf_path: path, po_pdf_name: file.name }
+    : { pdf_path: path, pdf_name: file.name };
 }
 
 export async function removePdf(path) {

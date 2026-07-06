@@ -2,15 +2,18 @@ import { state } from './state.js';
 import { insertMntRecord, updateMntRecord, insertFttbRecord, updateFttbRecord } from './data.js';
 import { renderTable, renderFttb } from './render.js';
 import { checkPdfSize, uploadPdf, removePdf, openPdf } from './pdfUpload.js';
+import { extractPdfText, parsePoInvoice } from './pdfParse.js';
 
 /* ====== MNT MODAL ====== */
 export function openAddModal() {
   state.editId = null;
   document.getElementById('m-title').textContent = 'Add Quote / PO';
-  ['m-date', 'm-expiry', 'm-docno', 'm-ref', 'm-amount', 'm-rep', 'm-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  ['m-date', 'm-expiry', 'm-docno', 'm-ref', 'm-amount', 'm-rep', 'm-notes', 'm-po-number', 'm-invoice-number'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('m-status').value = 'outstanding';
   document.getElementById('m-pdf').value = '';
   document.getElementById('m-pdf-cur').textContent = '';
+  document.getElementById('m-po-pdf').value = '';
+  document.getElementById('m-po-pdf-cur').textContent = '';
   document.getElementById('add-ov').classList.add('open');
 }
 
@@ -27,9 +30,29 @@ export function openEdit(id) {
   document.getElementById('m-rep').value = r.rep || '';
   document.getElementById('m-status').value = r.mnt_status || 'outstanding';
   document.getElementById('m-notes').value = r.notes || '';
+  document.getElementById('m-po-number').value = r.po_number || '';
+  document.getElementById('m-invoice-number').value = r.invoice_number || '';
   document.getElementById('m-pdf').value = '';
   document.getElementById('m-pdf-cur').textContent = r.pdf_name ? 'Current: ' + r.pdf_name : '';
+  document.getElementById('m-po-pdf').value = '';
+  document.getElementById('m-po-pdf-cur').textContent = r.po_pdf_name ? 'Current: ' + r.po_pdf_name : '';
   document.getElementById('add-ov').classList.add('open');
+}
+
+// Reads the PDF's text layer and fills PO/Invoice number fields, but only
+// when they're still empty — never overwrites a manual edit.
+export async function autoFillFromPdf(file) {
+  if (!file) return;
+  try {
+    const text = await extractPdfText(file);
+    const { poNumber, invoiceNumber } = parsePoInvoice(text);
+    const poEl = document.getElementById('m-po-number');
+    const invEl = document.getElementById('m-invoice-number');
+    if (poNumber && !poEl.value.trim()) poEl.value = poNumber;
+    if (invoiceNumber && !invEl.value.trim()) invEl.value = invoiceNumber;
+  } catch (e) {
+    console.warn('PDF auto-read failed:', e.message);
+  }
 }
 
 export function closeAddModal() {
@@ -47,24 +70,29 @@ export async function saveModal() {
     rep: document.getElementById('m-rep').value.trim(),
     mnt_status: document.getElementById('m-status').value,
     notes: document.getElementById('m-notes').value.trim(),
+    po_number: document.getElementById('m-po-number').value.trim(),
+    invoice_number: document.getElementById('m-invoice-number').value.trim(),
   };
   const pf = document.getElementById('m-pdf').files[0];
+  const pof = document.getElementById('m-po-pdf').files[0];
   if (pf && !checkPdfSize(pf)) { alert('Max 5MB'); return; }
+  if (pof && !checkPdfSize(pof)) { alert('Max 5MB'); return; }
 
   const editId = state.editId;
   const existing = editId ? state.records.find(r => r.id === editId) : null;
 
   saveBtn.disabled = true;
   try {
-    if (pf) {
-      const id = editId || crypto.randomUUID();
-      const up = await uploadPdf(id, pf);
-      Object.assign(d, up);
-    }
+    const id = editId || crypto.randomUUID();
+    if (pf) Object.assign(d, await uploadPdf(id, pf));
+    if (pof) Object.assign(d, await uploadPdf(id, pof, 'po'));
     if (editId) {
       await updateMntRecord(editId, d);
       if (pf && existing && existing.pdf_path && existing.pdf_path !== d.pdf_path) {
         await removePdf(existing.pdf_path);
+      }
+      if (pof && existing && existing.po_pdf_path && existing.po_pdf_path !== d.po_pdf_path) {
+        await removePdf(existing.po_pdf_path);
       }
     } else {
       await insertMntRecord(d);
@@ -109,6 +137,30 @@ export async function attPdf(id) {
 export function viewPdf(id) {
   const r = state.records.find(x => x.id === id);
   if (r && r.pdf_path) openPdf(r.pdf_path);
+}
+
+export async function attPoPdf(id) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.pdf';
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (!checkPdfSize(f)) { alert('Max 5MB'); return; }
+    const r = state.records.find(x => x.id === id);
+    try {
+      const up = await uploadPdf(id, f, 'po');
+      await updateMntRecord(id, up);
+      if (r && r.po_pdf_path && r.po_pdf_path !== up.po_pdf_path) await removePdf(r.po_pdf_path);
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+    }
+  };
+  inp.click();
+}
+
+export function viewPoPdf(id) {
+  const r = state.records.find(x => x.id === id);
+  if (r && r.po_pdf_path) openPdf(r.po_pdf_path);
 }
 
 /* ====== FTTB MODAL ====== */

@@ -5,6 +5,7 @@ import { renderTable, renderFttb, sortBy, clearDates } from './render.js';
 import { initRealtime, teardownRealtime } from './realtime.js';
 import {
   openAddModal, openEdit, closeAddModal, saveModal, updStatus, updNotes, attPdf, viewPdf,
+  attPoPdf, viewPoPdf, autoFillFromPdf,
   openFttbAdd, openFttbEdit, closeFttbModal, saveFttbModal, updFttbSt, updFttbNotes,
 } from './modal.js';
 import {
@@ -77,6 +78,8 @@ function wireEvents() {
     if (btn.dataset.action === 'edit') openEdit(id);
     else if (btn.dataset.action === 'view-pdf') viewPdf(id);
     else if (btn.dataset.action === 'attach-pdf') attPdf(id);
+    else if (btn.dataset.action === 'view-po-pdf') viewPoPdf(id);
+    else if (btn.dataset.action === 'attach-po-pdf') attPoPdf(id);
   });
   tbody.addEventListener('change', (e) => {
     const el = e.target;
@@ -87,6 +90,8 @@ function wireEvents() {
   // MNT add/edit modal
   document.getElementById('m-cancel-btn').addEventListener('click', closeAddModal);
   document.getElementById('m-save-btn').addEventListener('click', saveModal);
+  ['m-po-pdf', 'm-pdf'].forEach(id =>
+    document.getElementById(id).addEventListener('change', (e) => autoFillFromPdf(e.target.files[0])));
 
   // FTTB toolbar
   document.getElementById('fttb-srch').addEventListener('input', renderFttb);

@@ -68,7 +68,7 @@ export function renderTable() {
   try { populateReps(); _renderTable(); }
   catch (e) {
     const tb = document.getElementById('tbody');
-    if (tb) tb.innerHTML = `<tr><td colspan="9" class="nores">Error: ${e.message}</td></tr>`;
+    if (tb) tb.innerHTML = `<tr><td colspan="11" class="nores">Error: ${e.message}</td></tr>`;
   }
 }
 
@@ -83,25 +83,30 @@ function _renderTable() {
   document.getElementById('rcnt').textContent = `Showing ${rows.length} of ${state.records.length} records`;
   updateStats(rows, isFiltered);
   const tb = document.getElementById('tbody');
-  if (!rows.length) { tb.innerHTML = '<tr><td colspan="9" class="nores">No matching records.</td></tr>'; return; }
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="11" class="nores">No matching records.</td></tr>'; return; }
   tb.innerHTML = rows.map((r) => {
     const v = es(r);
     const sel = `<select class="ssel" data-id="${r.id}" data-action="status">` +
       STATUS_OPTS.map(([val, label]) => `<option value="${val}"${v === val ? ' selected' : ''}>${label}</option>`).join('') +
       '</select>';
     const pb = r.pdf_name
-      ? `<button class="pbtn" data-id="${r.id}" data-action="view-pdf" title="View PDF">📄</button>`
-      : `<button class="pbtn" data-id="${r.id}" data-action="attach-pdf" title="Attach PDF">📐</button>`;
+      ? `<button class="pbtn" data-id="${r.id}" data-action="view-pdf" title="View Invoice PDF">📄</button>`
+      : `<button class="pbtn" data-id="${r.id}" data-action="attach-pdf" title="Attach Invoice PDF">📐</button>`;
+    const pob = r.po_pdf_name
+      ? `<button class="pbtn" data-id="${r.id}" data-action="view-po-pdf" title="View PO PDF">📄</button>`
+      : `<button class="pbtn" data-id="${r.id}" data-action="attach-po-pdf" title="Attach PO PDF">📐</button>`;
     return '<tr>' +
       `<td>${fd(r.date)}</td>` +
       `<td>${fd(r.expiry)}</td>` +
       `<td style="font-weight:600;white-space:nowrap">${esc(r.doc_no || '')}</td>` +
       `<td style="max-width:250px">${esc(r.ref || '')}</td>` +
+      `<td style="white-space:nowrap">${esc(r.po_number || '')}</td>` +
+      `<td style="white-space:nowrap">${esc(r.invoice_number || '')}</td>` +
       `<td style="white-space:nowrap">${fa(r.amount)}</td>` +
       `<td>${esc(r.rep || '')}</td>` +
       `<td>${sel}</td>` +
       `<td><input class="ninp" data-id="${r.id}" data-action="notes" value="${esc(r.notes || '')}" placeholder="Add note..."></td>` +
-      `<td><button class="ebtn" data-id="${r.id}" data-action="edit">✏️</button>${pb}</td>` +
+      `<td><button class="ebtn" data-id="${r.id}" data-action="edit">✏️</button>${pb}${pob}</td>` +
       '</tr>';
   }).join('');
 }
