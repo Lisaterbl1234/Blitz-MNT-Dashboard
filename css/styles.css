@@ -32,7 +32,6 @@ header h1{font-size:1.2rem;font-weight:600}
 .toolbar input[type=text],.toolbar select,.toolbar input[type=date]{padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:.84rem;background:#fff;outline:none}
 .toolbar input[type=text]{width:210px}
 .toolbar input[type=text]:focus,.toolbar select:focus,.toolbar input[type=date]:focus{border-color:#a8b8d8}
-.dlbl{font-size:.76rem;color:#666;display:flex;align-items:center;gap:5px}
 .btn{padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.83rem;font-weight:600;border:none}
 .btn-blue{background:#6e8ab5;color:#fff}.btn-blue:hover{background:#5a7aa5}
 .btn-green{background:#4a8a5a;color:#fff}

@@ -28,17 +28,18 @@ function getFiltered() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   const st = document.getElementById('fil-status').value;
   const rep = document.getElementById('fil-rep').value;
-  const mo = document.getElementById('fil-month').value;
-  const dtField = 'date';
-  const df = document.getElementById('d-from').value;
-  const dto = document.getElementById('d-to').value;
+  const moFrom = Number(document.getElementById('fil-month-from').value) || null;
+  const moTo = Number(document.getElementById('fil-month-to').value) || null;
   return getSorted().filter((r) => {
     if (st && es(r) !== st) return false;
     if (rep && r.rep !== rep) return false;
-    const ds = r[dtField] || '';
-    if (mo) { const d = pd(ds); if (!d || String(d.getMonth() + 1).padStart(2, '0') !== mo) return false; }
-    if (df) { const d = pd(ds); if (!d || d < new Date(df)) return false; }
-    if (dto) { const d = pd(ds); if (!d || d > new Date(dto + 'T23:59:59')) return false; }
+    if (moFrom || moTo) {
+      const d = pd(r.date);
+      if (!d) return false;
+      const mo = d.getMonth() + 1;
+      if (moFrom && mo < moFrom) return false;
+      if (moTo && mo > moTo) return false;
+    }
     if (q) {
       const hay = [r.doc_no, r.ref, r.rep, r.notes, String(r.amount)].join(' ').toLowerCase();
       if (hay.indexOf(q) < 0) return false;
@@ -47,9 +48,9 @@ function getFiltered() {
   });
 }
 
-export function clearDates() {
-  document.getElementById('d-from').value = '';
-  document.getElementById('d-to').value = '';
+export function clearMonths() {
+  document.getElementById('fil-month-from').value = '';
+  document.getElementById('fil-month-to').value = '';
   renderTable();
 }
 

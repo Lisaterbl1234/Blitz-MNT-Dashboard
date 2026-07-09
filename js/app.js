@@ -1,7 +1,7 @@
 import { initAuth } from './auth.js';
 import { state } from './state.js';
 import { fetchMntRecords, fetchFttbRecords } from './data.js';
-import { renderTable, renderFttb, sortBy, clearDates } from './render.js';
+import { renderTable, renderFttb, sortBy, clearMonths } from './render.js';
 import { initRealtime, teardownRealtime } from './realtime.js';
 import {
   openAddModal, openEdit, closeAddModal, saveModal, updStatus, updNotes, attPdf, viewPdf,
@@ -56,9 +56,9 @@ function wireEvents() {
 
   // MNT toolbar
   document.getElementById('search').addEventListener('input', renderTable);
-  ['fil-status', 'fil-rep', 'fil-month', 'd-from', 'd-to'].forEach(id =>
+  ['fil-status', 'fil-rep', 'fil-month-from', 'fil-month-to'].forEach(id =>
     document.getElementById(id).addEventListener('change', renderTable));
-  document.getElementById('clear-dates-btn').addEventListener('click', clearDates);
+  document.getElementById('clear-months-btn').addEventListener('click', clearMonths);
   document.getElementById('add-mnt-btn').addEventListener('click', openAddModal);
   document.getElementById('import-mnt-btn').addEventListener('click', openImport);
   document.getElementById('hod-btn').addEventListener('click', openHod);
