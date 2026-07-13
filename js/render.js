@@ -28,17 +28,16 @@ function getFiltered() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   const st = document.getElementById('fil-status').value;
   const rep = document.getElementById('fil-rep').value;
-  const moFrom = Number(document.getElementById('fil-month-from').value) || null;
-  const moTo = Number(document.getElementById('fil-month-to').value) || null;
+  const dtFrom = document.getElementById('fil-date-from').value;
+  const dtTo = document.getElementById('fil-date-to').value;
   return getSorted().filter((r) => {
     if (st && es(r) !== st) return false;
     if (rep && r.rep !== rep) return false;
-    if (moFrom || moTo) {
+    if (dtFrom || dtTo) {
       const d = pd(r.date);
       if (!d) return false;
-      const mo = d.getMonth() + 1;
-      if (moFrom && mo < moFrom) return false;
-      if (moTo && mo > moTo) return false;
+      if (dtFrom && d < new Date(dtFrom)) return false;
+      if (dtTo && d > new Date(dtTo + 'T23:59:59')) return false;
     }
     if (q) {
       const hay = [r.doc_no, r.ref, r.rep, r.notes, String(r.amount)].join(' ').toLowerCase();
@@ -48,9 +47,9 @@ function getFiltered() {
   });
 }
 
-export function clearMonths() {
-  document.getElementById('fil-month-from').value = '';
-  document.getElementById('fil-month-to').value = '';
+export function clearDates() {
+  document.getElementById('fil-date-from').value = '';
+  document.getElementById('fil-date-to').value = '';
   renderTable();
 }
 

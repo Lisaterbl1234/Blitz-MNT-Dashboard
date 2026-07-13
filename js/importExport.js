@@ -26,6 +26,23 @@ const FTTB_AL = {
 
 const DATE_FIELDS = new Set(['date', 'expiry']);
 
+// Spreadsheets tend to use human-readable status text (e.g. "Quote",
+// "PO Outstanding") rather than the internal codes the app filters/dropdowns
+// use ('quotes', 'outstanding', ...). Without normalizing on import, those
+// rows fail to match any dropdown option and silently default to the first
+// one, and status filters like "Quotes" never find them.
+const MNT_STATUS_ALIASES = {
+  outstanding: 'outstanding', 'po outstanding': 'outstanding', pending: 'outstanding',
+  tobeinvoiced: 'tobeinvoiced', 'to be invoiced': 'tobeinvoiced', 'to invoice': 'tobeinvoiced',
+  invoice: 'invoice', invoiced: 'invoice',
+  quotes: 'quotes', quote: 'quotes', quoted: 'quotes',
+  cancelled: 'cancelled', canceled: 'cancelled',
+};
+function normalizeMntStatus(raw) {
+  const key = String(raw || '').toLowerCase().trim();
+  return MNT_STATUS_ALIASES[key] || '';
+}
+
 // Real-world exports often have title/report-metadata rows above the actual
 // header row (e.g. "FTTB Jobs Exporter Data as of: ..."). Scan the first few
 // rows and pick whichever one matches the most known column aliases, rather
@@ -85,6 +102,7 @@ export function handleImport(inputEl, type) {
         Object.keys(cm).forEach((field) => {
           let val = String(r[cm[field]] || '').trim();
           if (DATE_FIELDS.has(field)) val = toIsoDate(val) || null;
+          else if (field === 'mnt_status') val = normalizeMntStatus(val);
           obj[field] = val;
         });
         if (type === 'mnt') { obj.mnt_status = obj.mnt_status || 'outstanding'; obj.notes = obj.notes || ''; }
