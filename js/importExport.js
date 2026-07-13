@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { esc, fa, toIsoDate } from './helpers.js';
+import { esc, pd, toIsoDate } from './helpers.js';
 import { bulkInsertMntRecords, updateMntRecord, bulkInsertFttbRecords, updateFttbRecord } from './data.js';
 
 const MNT_AL = {
@@ -157,57 +157,100 @@ export async function doImport(type) {
   }
 }
 
-/* ====== HOD REPORT ====== */
-function es(r) { return r.mnt_status || 'outstanding'; }
+/* ====== HOD REPORT — Maintenance ticket allocations per region ====== */
+
+// Each rep name already encodes the region they cover.
+const REP_REGION = {
+  'magda central': 'Central',
+  'magda gauteng': 'Gauteng',
+  'magda pe': 'Eastern Cape',
+};
+const REGIONS = ['Central', 'Eastern Cape', 'Gauteng'];
+const REGION_COLORS = { Central: '#2a78d6', 'Eastern Cape': '#1baf7a', Gauteng: '#eda100' };
+
+function regionOf(r) { return REP_REGION[String(r.rep || '').toLowerCase().trim()] || null; }
+
+function regionCountsForMonth(monthStr) {
+  const counts = {};
+  REGIONS.forEach((r) => { counts[r] = 0; });
+  if (!monthStr) return counts;
+  state.records.forEach((r) => {
+    const d = pd(r.date);
+    if (!d) return;
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (ym !== monthStr) return;
+    const reg = regionOf(r);
+    if (reg) counts[reg]++;
+  });
+  return counts;
+}
+
+function monthLabel(monthStr) {
+  if (!monthStr) return 'Select a month';
+  const [y, m] = monthStr.split('-');
+  return new Date(Number(y), Number(m) - 1, 1)
+    .toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }).toUpperCase();
+}
+
+function renderRegionPanel(monthStr) {
+  const counts = regionCountsForMonth(monthStr);
+  const max = Math.max(1, ...REGIONS.map((r) => counts[r]));
+  const total = REGIONS.reduce((a, r) => a + counts[r], 0);
+  const bars = REGIONS.map((r) => {
+    const pct = Math.round((counts[r] / max) * 100);
+    return `<div class="hod-bar-col">` +
+      `<div class="hod-bar-val">${counts[r]}</div>` +
+      `<div class="hod-bar" style="height:${pct}%;background:${REGION_COLORS[r]}"></div>` +
+      `<div class="hod-bar-label">${esc(r)}</div>` +
+      '</div>';
+  }).join('');
+  return `<div class="hod-region-panel">` +
+    `<div class="hod-region-title">${esc(monthLabel(monthStr))} TICKET ALLOCATIONS</div>` +
+    `<div class="hod-bars">${bars}</div>` +
+    `<div class="hod-total">TOTAL TICKETS: <strong>${total}</strong></div>` +
+    '</div>';
+}
+
+export function renderHodReport() {
+  const a = document.getElementById('hod-month-a').value;
+  const b = document.getElementById('hod-month-b').value;
+  const legend = `<div class="hod-legend">${REGIONS.map((r) =>
+    `<span class="hod-legend-item"><span class="hod-legend-swatch" style="background:${REGION_COLORS[r]}"></span>${esc(r)}</span>`
+  ).join('')}</div>`;
+  document.getElementById('hod-content').innerHTML =
+    legend + `<div class="hod-panels">${renderRegionPanel(a)}${renderRegionPanel(b)}</div>`;
+}
 
 export function openHod() {
-  const reps = state.records.map(r => r.rep).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).sort();
-  const grand = state.records.reduce((a, r) => a + (Number(r.amount) || 0), 0);
-  const amtS = (recs, s) => recs.filter(r => es(r) === s).reduce((a, r) => a + (Number(r.amount) || 0), 0);
-  const rows = reps.map((rep) => {
-    const recs = state.records.filter(r => r.rep === rep);
-    const tot = recs.reduce((a, r) => a + (Number(r.amount) || 0), 0);
-    return '<tr style="border-bottom:1px solid #f0edf8">' +
-      `<td style="padding:7px 11px">${esc(rep)}</td>` +
-      `<td style="padding:7px 11px;text-align:right">${fa(tot)}</td>` +
-      `<td style="padding:7px 11px;text-align:right">${fa(amtS(recs, 'outstanding'))}</td>` +
-      `<td style="padding:7px 11px;text-align:right">${fa(amtS(recs, 'tobeinvoiced'))}</td>` +
-      `<td style="padding:7px 11px;text-align:right">${fa(amtS(recs, 'invoice'))}</td>` +
-      `<td style="padding:7px 11px;text-align:right">${recs.length}</td>` +
-      '</tr>';
-  });
-  document.getElementById('hod-content').innerHTML =
-    `<p style="font-size:.8rem;color:#888;margin-bottom:12px">Grand Total: <strong>${fa(grand)}</strong> across <strong>${state.records.length}</strong> records</p>` +
-    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.83rem">' +
-    '<thead><tr style="background:#f0edf8">' +
-    '<th style="padding:7px 11px;text-align:left">Sales Rep</th>' +
-    '<th style="padding:7px 11px;text-align:right">Total</th>' +
-    '<th style="padding:7px 11px;text-align:right">PO Outstanding</th>' +
-    '<th style="padding:7px 11px;text-align:right">To Be Invoiced</th>' +
-    '<th style="padding:7px 11px;text-align:right">Invoiced</th>' +
-    '<th style="padding:7px 11px;text-align:right">Count</th>' +
-    `</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  const now = new Date();
+  const ma = document.getElementById('hod-month-a');
+  const mb = document.getElementById('hod-month-b');
+  if (!ma.value) {
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    ma.value = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+  }
+  if (!mb.value) mb.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  renderHodReport();
   document.getElementById('hod-ov').classList.add('open');
 }
 export function closeHod() { document.getElementById('hod-ov').classList.remove('open'); }
 
 export function downloadHodExcel() {
-  const reps = state.records.map(r => r.rep).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).sort();
-  const amtS = (recs, s) => recs.filter(r => es(r) === s).reduce((a, r) => a + (Number(r.amount) || 0), 0);
-  const wsData = [['Sales Rep', 'Total (R)', 'PO Outstanding (R)', 'To Be Invoiced (R)', 'Invoiced (R)', 'Count']];
-  let grandTot = 0, grandOut = 0, grandTbi = 0, grandInv = 0, grandCnt = 0;
-  reps.forEach((rep) => {
-    const recs = state.records.filter(r => r.rep === rep);
-    const tot = recs.reduce((a, r) => a + (Number(r.amount) || 0), 0);
-    const out = amtS(recs, 'outstanding'), tbi = amtS(recs, 'tobeinvoiced'), inv = amtS(recs, 'invoice');
-    wsData.push([rep, tot, out, tbi, inv, recs.length]);
-    grandTot += tot; grandOut += out; grandTbi += tbi; grandInv += inv; grandCnt += recs.length;
-  });
-  wsData.push(['TOTAL', grandTot, grandOut, grandTbi, grandInv, grandCnt]);
+  const a = document.getElementById('hod-month-a').value;
+  const b = document.getElementById('hod-month-b').value;
+  const countsA = regionCountsForMonth(a);
+  const countsB = regionCountsForMonth(b);
+  const wsData = [['Region', monthLabel(a), monthLabel(b)]];
+  REGIONS.forEach((r) => wsData.push([r, countsA[r], countsB[r]]));
+  wsData.push([
+    'TOTAL',
+    REGIONS.reduce((s, r) => s + countsA[r], 0),
+    REGIONS.reduce((s, r) => s + countsB[r], 0),
+  ]);
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 8 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'HOD Report');
+  ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Maintenance Report');
   const date = new Date().toLocaleDateString('en-ZA').replace(/\//g, '-');
-  XLSX.writeFile(wb, `HOD_Report_${date}.xlsx`);
+  XLSX.writeFile(wb, `Maintenance_Report_${date}.xlsx`);
 }

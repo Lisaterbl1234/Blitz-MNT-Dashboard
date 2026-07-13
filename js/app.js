@@ -10,7 +10,7 @@ import {
 } from './modal.js';
 import {
   openImport, closeImport, openFttbImport, closeFttbImport, handleImport, doImport,
-  openHod, closeHod, downloadHodExcel,
+  openHod, closeHod, downloadHodExcel, renderHodReport,
 } from './importExport.js';
 
 function switchTab(t) {
@@ -120,6 +120,8 @@ function wireEvents() {
   document.getElementById('hod-close-btn').addEventListener('click', closeHod);
   document.getElementById('hod-download-btn').addEventListener('click', downloadHodExcel);
   document.getElementById('hod-ov').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeHod(); });
+  document.getElementById('hod-month-a').addEventListener('change', renderHodReport);
+  document.getElementById('hod-month-b').addEventListener('change', renderHodReport);
 
   // Import MNT
   document.getElementById('imp-close-btn').addEventListener('click', closeImport);
