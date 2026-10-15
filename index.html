@@ -1,253 +1,1080 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blitz MNT Invoice Tracker</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="css/styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
+<title>Blitz Stock Control</title>
+<meta name="app-build" content="10">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&display=swap">
+<style>
+/* Layout: one working column. Header with who-is-working, four value figures, then tabs: Stock / Hand over / Activity / Quotes.
+   Quote identity uses the fibre colour code sequence (blue, orange, green, brown, slate, red). */
+:root{
+  /* Blitz Fibre brand: deep wine ground, crimson accent, pink labels. One dark look by choice. */
+  color-scheme:dark;
+  --bg:#150910; --surface:#22101a; --sunk:#1a0c14; --ink:#fbf3f6; --muted:#c7a0b0; --line:#40202e;
+  --accent:#d42463; --accent-ink:#ffffff; --accent-soft:#4a1630; --pink:#f26aa0;
+  --ok:#5fd08c; --warn:#f2b04e; --crit:#ff8a80; --warn-soft:#3a2613;
+  --f1:#5ea6ff; --f2:#f39a3d; --f3:#55c483; --f4:#c79a78; --f5:#aab6c4; --f6:#ff7b72;
+  --display:Calibri,"Carlito","Segoe UI",system-ui,sans-serif;
+  --body:Calibri,"Carlito","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{background:radial-gradient(1100px 520px at 88% -8%,#3d1328 0%,rgba(61,19,40,0) 62%) no-repeat,var(--bg);color:var(--ink);font:16px/1.45 var(--body);padding-inline:16px;padding-block:20px 60px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:32px;font-weight:700;line-height:1.1}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.32em;text-transform:uppercase;color:var(--pink);margin-bottom:6px}
+.brand{display:flex;gap:16px;align-items:center}
+.brand svg{flex:none;width:58px;height:auto}
+h2{font-size:20px;font-weight:600}
+h3{font-size:16px;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+header.top p{margin:4px 0 0;color:var(--pink)}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);min-width:0}
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0;width:100%;text-transform:none;letter-spacing:0;font-weight:400;font-size:15px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:8px 14px;font-weight:600}
+button:hover{border-color:var(--pink)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.danger{color:var(--crit)}
+button.sm{padding:4px 10px;font-size:13px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.fig{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.fig .k{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fig .v{font-family:var(--display);font-size:26px;font-weight:600;line-height:1.15;overflow-wrap:anywhere}
+.fig .s{font-size:13px;color:var(--muted)}
+.fig i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+nav.tabs button{border:0;background:none;border-radius:0;padding:10px 14px;font-family:var(--display);font-size:17px;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+section.tab{display:flex;flex-direction:column;gap:14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.bar label{flex:1 1 160px}
+.bar .grow{flex:3 1 220px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.pad{padding:16px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right}
+td.item{min-width:230px}
+td.item b{font-weight:600}
+.code{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap;color:var(--muted)}
+.chip i{width:9px;height:9px;border-radius:50%;flex:none}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pill.use{color:var(--ok);border-color:var(--ok)}
+.pill.issue{color:var(--warn);border-color:var(--warn)}
+.pill.return{color:var(--pink);border-color:var(--pink)}
+.pill.over{background:var(--accent-soft);color:var(--pink);border-color:transparent}
+.pill.ok{color:var(--ok);border-color:var(--ok)}
+.pill.wait{color:var(--warn);border-color:var(--warn)}
+.pill.late{color:var(--crit);border-color:var(--crit)}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.photos figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.photos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:var(--sunk);display:block}
+img.thumb{width:44px;height:44px;object-fit:cover;border-radius:5px;border:1px solid var(--line);display:block;background:var(--sunk)}
+.thumb.none{width:44px;height:44px;border-radius:5px;border:1px dashed var(--line);display:block}
+details.tech{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+details.tech summary{cursor:pointer;padding:14px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;list-style:none}
+details.tech summary::-webkit-details-marker{display:none}
+details.tech summary h3{font-size:18px}
+details.tech .pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+details.tech[open] summary{border-bottom:1px solid var(--line)}
+a{color:var(--pink)}
+.pill.ex{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.split{display:flex;height:8px;min-width:110px;border-radius:4px;overflow:hidden;background:var(--sunk)}
+.split span{display:block;height:100%}
+.s-used{background:var(--ok)} .s-tech{background:var(--warn)} .s-store{background:var(--accent)}
+.zero{color:var(--muted)}
+.note{background:var(--warn-soft);border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+input.qty{width:90px;text-align:right}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(8,14,22,.55)}
+dialog .pad{display:flex;flex-direction:column;gap:14px}
+.dhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.kv{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
+.kv b{font-variant-numeric:tabular-nums}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;width:max-content;max-width:100%}
+.seg button{border:0;border-radius:0;background:var(--surface);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.slip{border:1px solid var(--line);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:12px;background:var(--bg)}
+.slip h3{font-size:20px}
+.slip .sig{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:22px;margin-top:10px}
+.slip .sig div{border-top:1px solid var(--ink);padding-top:4px;font-size:13px}
+.slip p{margin:0;max-width:65ch}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:500;max-width:calc(100vw - 32px);z-index:50}
+.err{color:var(--crit);font-size:13px;font-weight:500;min-height:1em}
+@media (max-width:720px){ .figs{grid-template-columns:repeat(2,minmax(0,1fr))} h1{font-size:24px} .fig .v{font-size:21px} }
+</style>
 
-<!-- LOGIN SCREEN -->
-<div id="login-screen">
-  <div class="login-card">
-    <h1>&#128196; Blitz MNT Invoice Tracker</h1>
-    <p>Sign in with your team account to continue.</p>
-    <form id="login-form">
-      <div class="fr"><label>Email</label><input type="email" id="login-email" autocomplete="username" required></div>
-      <div class="fr"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" required></div>
-      <button type="submit" class="btn btn-blue">Sign In</button>
-    </form>
-    <form id="signup-form" class="hidden">
-      <div class="fr"><label>Email</label><input type="email" id="signup-email" autocomplete="username" required></div>
-      <div class="fr"><label>Password</label><input type="password" id="signup-password" autocomplete="new-password" required minlength="6"></div>
-      <button type="submit" class="btn btn-blue">Create Account</button>
-    </form>
-    <div id="login-msg"></div>
-    <p class="login-toggle"><a href="#" id="toggle-auth-mode">Need an account? Sign Up</a></p>
-  </div>
-</div>
-
-<div id="app" class="hidden">
-<div id="err-banner"></div>
-<header>
-  <h1>&#128196; Blitz MNT Invoice Tracker</h1>
-  <div class="hdr-right">
-    <span id="last-saved"></span>
-    <div id="sync-badge" title="Live sync status">
-      <span class="sync-dot"></span><span id="sync-text">&#128293; Live</span>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 58 36" aria-hidden="true"><defs><linearGradient id="bz" x1="0" x2="1"><stop offset="0" stop-color="#7a1236"/><stop offset="1" stop-color="#e02a6b"/></linearGradient></defs>
+        <rect x="14" y="0" width="44" height="9" rx="4.5" fill="url(#bz)"/><rect x="0" y="13.5" width="9" height="9" rx="4.5" fill="url(#bz)"/><rect x="13" y="13.5" width="34" height="9" rx="4.5" fill="url(#bz)"/><rect x="6" y="27" width="40" height="9" rx="4.5" fill="url(#bz)"/></svg>
+      <div><div class="eyebrow">Blitz Fibre · Stock control</div>
+      <h1>Blitz Stock Control</h1>
+      <p>From the store, to the technician, to the site.</p></div>
     </div>
-    <span class="user-email" id="user-email"></span>
-    <button class="hbtn" id="sign-out-btn">Sign Out</button>
-  </div>
-</header>
-<div class="tabs">
-  <div class="tab active" id="tab-mnt">&#128203; MNT Quotes / POs</div>
-  <div class="tab" id="tab-fttb">&#128296; FTTB Patching</div>
-</div>
-
-<div id="mnt-sec">
-  <div class="stats" id="stats-row"></div>
-  <div class="toolbar">
-    <input type="text" id="search" placeholder="Search doc no, reference, rep...">
-    <select id="fil-status">
-      <option value="">All POs</option>
-      <option value="outstanding">PO Outstanding</option>
-      <option value="tobeinvoiced">To Be Invoiced</option>
-      <option value="invoice">Invoiced</option>
-      <option value="quotes">Quotes</option>
-      <option value="cancelled">Cancelled</option>
-    </select>
-    <select id="fil-rep"><option value="">All Reps</option></select>
-    <input type="date" id="fil-date-from" title="From date">
-    <input type="date" id="fil-date-to" title="To date">
-    <button class="btn btn-grey" id="clear-dates-btn" style="padding:6px 9px">&#215; Dates</button>
-    <button class="btn btn-blue" id="add-mnt-btn" style="margin-left:auto">+ Add Quote / PO</button>
-    <button class="btn btn-green" id="import-mnt-btn">&#128202; Import Excel</button>
-  </div>
-  <button class="btn-hod" id="hod-btn">&#128202; HOD Report</button>
-  <div class="rcnt" id="rcnt"></div>
-  <div class="tblw">
-    <table>
-      <thead><tr>
-        <th data-sort="date">Date &#8597;</th>
-        <th data-sort="expiry">Expiry &#8597;</th>
-        <th data-sort="docNo">Doc No &#8597;</th>
-        <th>Customer Ref</th>
-        <th>PO No</th>
-        <th>Invoice No</th>
-        <th data-sort="amount">Amount &#8597;</th>
-        <th data-sort="rep">Sales Rep &#8597;</th>
-        <th>Status</th>
-        <th>Notes</th>
-        <th>Doc</th>
-      </tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-</div>
-
-<div id="fttb-sec" style="display:none">
-  <div class="stats" id="fttb-stats"></div>
-  <div class="toolbar">
-    <input type="text" id="fttb-srch" placeholder="Search customer, ticket, FRG ref...">
-    <select id="fttb-fil-stage">
-      <option value="">All Stages</option>
-      <option value="Survey">Survey</option>
-      <option value="Scheduling">Scheduling</option>
-      <option value="Build">Build</option>
-      <option value="Job Report Approvals">Job Report Approvals</option>
-      <option value="FF Approved">FF Approved</option>
-      <option value="Permissions">Permissions</option>
-    </select>
-    <select id="fttb-fil-status">
-      <option value="">All Invoice Status</option>
-      <option value="invoiced">Invoiced</option>
-      <option value="toinvoice">To Invoice</option>
-      <option value="pending">Pending</option>
-    </select>
-    <button class="btn btn-blue" id="add-fttb-btn" style="margin-left:auto">+ Add FTTB Record</button>
-    <button class="btn btn-green" id="import-fttb-btn">&#128202; Import FTTB</button>
-  </div>
-  <div class="rcnt" id="fttb-rcnt"></div>
-  <div class="tblw">
-    <table>
-      <thead><tr>
-        <th>FRG Ref</th><th>Link Status</th><th>Customer</th><th>Job Type</th>
-        <th>Ticket</th><th>Stage</th><th>Invoice Status</th><th>Amount</th><th>Notes</th>
-      </tr></thead>
-      <tbody id="fttb-tbody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ADD/EDIT MODAL (MNT) -->
-<div class="ov" id="add-ov">
-  <div class="mdl">
-    <h2 id="m-title">Add Quote / PO</h2>
-    <div class="fr"><label>Date</label><input type="date" id="m-date"></div>
-    <div class="fr"><label>Expiry</label><input type="date" id="m-expiry"></div>
-    <div class="fr"><label>Doc No.</label><input type="text" id="m-docno" placeholder="QUO0003000"></div>
-    <div class="fr"><label>Customer Ref</label><input type="text" id="m-ref"></div>
-    <div class="fr"><label>Amount (R)</label><input type="number" id="m-amount" step="0.01"></div>
-    <div class="fr"><label>Sales Rep</label><input type="text" id="m-rep"></div>
-    <div class="fr"><label>Status</label>
-      <select id="m-status">
-        <option value="outstanding">PO Outstanding</option>
-        <option value="tobeinvoiced">To Be Invoiced</option>
-        <option value="invoice">Invoiced</option>
-        <option value="quotes">Quote</option>
-        <option value="cancelled">Cancelled</option>
-      </select></div>
-    <div class="fr"><label>Notes</label><textarea id="m-notes"></textarea></div>
-
-    <h3 style="font-size:.85rem;color:#3a3a5a;margin:18px 0 10px;border-top:1px solid #eee;padding-top:14px">PO Number &amp; Invoice Tracking</h3>
-    <div class="fr"><label>PO Number</label><input type="text" id="m-po-number" placeholder="PO-FF046597"></div>
-    <div class="fr"><label>Attach PO PDF</label><input type="file" id="m-po-pdf" accept=".pdf"></div>
-    <div id="m-po-pdf-cur" style="font-size:.78rem;color:#888;margin-top:3px"></div>
-    <div class="fr"><label>Invoice Number</label><input type="text" id="m-invoice-number" placeholder="IN108996"></div>
-    <div class="fr"><label>Attach Invoice PDF</label><input type="file" id="m-pdf" accept=".pdf"></div>
-    <div id="m-pdf-cur" style="font-size:.78rem;color:#888;margin-top:3px"></div>
-    <p style="font-size:.72rem;color:#999;margin-top:-4px">Attaching a PDF auto-fills the PO/Invoice numbers above from its text, when found.</p>
-
-    <div class="mbtns">
-      <button class="btn btn-grey" id="m-cancel-btn">Cancel</button>
-      <button class="btn btn-blue" id="m-save-btn">Save</button>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <label style="flex:0 1 220px">Your name
+        <input id="me" placeholder="Name shown on entries" autocomplete="name">
+      </label>
+      <button id="rep-go">Full stock and asset report</button>
     </div>
-  </div>
-</div>
+  </header>
 
-<!-- FTTB MODAL -->
-<div class="ov" id="fttb-ov">
-  <div class="mdl">
-    <h2 id="fm-title">Add FTTB Record</h2>
-    <div class="fr"><label>FRG Ref</label><input type="text" id="fm-frgref"></div>
-    <div class="fr"><label>Link Status</label><input type="text" id="fm-link"></div>
-    <div class="fr"><label>Customer</label><input type="text" id="fm-cust"></div>
-    <div class="fr"><label>Job Type</label><input type="text" id="fm-job"></div>
-    <div class="fr"><label>Ticket</label><input type="text" id="fm-ticket"></div>
-    <div class="fr"><label>Stage</label>
-      <select id="fm-stage">
-        <option value="Survey">Survey</option>
-        <option value="Scheduling">Scheduling</option>
-        <option value="Build">Build</option>
-        <option value="Job Report Approvals">Job Report Approvals</option>
-        <option value="FF Approved">FF Approved</option>
-        <option value="Permissions">Permissions</option>
-      </select></div>
-    <div class="fr"><label>Invoice Status</label>
-      <select id="fm-status">
-        <option value="">None</option>
-        <option value="toinvoice">To Invoice</option>
-        <option value="invoiced">Invoiced</option>
-        <option value="pending">Pending</option>
-      </select></div>
-    <div class="fr"><label>Amount (R)</label><input type="number" id="fm-amt" step="0.01"></div>
-    <div class="fr"><label>Notes</label><textarea id="fm-notes"></textarea></div>
-    <div class="mbtns">
-      <button class="btn btn-grey" id="fm-cancel-btn">Cancel</button>
-      <button class="btn btn-blue" id="fm-save-btn">Save</button>
+  <div id="banner" hidden class="note"></div>
+
+  <div class="figs" id="figs">
+    <div class="fig"><span class="k">Invoiced stock</span><span class="v num" id="f-total">–</span><span class="s" id="f-total-s">Loading…</span></div>
+    <div class="fig"><span class="k"><i class="s-store"></i>In store</span><span class="v num" id="f-store">–</span><span class="s" id="f-store-s">&nbsp;</span></div>
+    <div class="fig"><span class="k"><i class="s-tech"></i>With technicians</span><span class="v num" id="f-tech">–</span><span class="s" id="f-tech-s">&nbsp;</span></div>
+    <div class="fig"><span class="k"><i class="s-used"></i>Used on site</span><span class="v num" id="f-used">–</span><span class="s" id="f-used-s">&nbsp;</span></div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="stock" aria-selected="true">Stock</button>
+    <button role="tab" data-tab="onhand" aria-selected="false">On hand</button>
+    <button role="tab" data-tab="handover" aria-selected="false">Hand over</button>
+    <button role="tab" data-tab="techs" aria-selected="false">Technicians</button>
+    <button role="tab" data-tab="assets" aria-selected="false">Assets</button>
+    <button role="tab" data-tab="activity" aria-selected="false">Activity</button>
+    <button role="tab" data-tab="quotes" aria-selected="false">Invoices</button>
+    <button role="tab" data-tab="pos" aria-selected="false">Purchase orders</button>
+  </nav>
+
+  <section class="tab" id="tab-stock">
+    <div class="bar">
+      <label class="grow">Search<input id="q" type="search" placeholder="Code or description"></label>
+      <label>Project<select id="fq"></select></label>
+      <label>Stock type<select id="fc"></select></label>
+      <label>Site type<select id="ft"></select></label>
+      <label>Show<select id="fs"><option value="">All lines</option><option value="over">Leftover and store stock, free to use</option><option value="store">Has stock in store</option><option value="tech">Held by technicians</option><option value="used">Used on site</option><option value="left">Not fully used</option></select></label>
     </div>
-  </div>
-</div>
+    <div class="panel scroll" id="stock-box"><div class="empty">Loading stock…</div></div>
+  </section>
 
-<!-- HOD -->
-<div id="hod-ov">
-  <div id="hod-mdl">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <h2 style="font-size:1.05rem;color:#3a3a5a">&#128202; HOD Report</h2>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="hod-download-btn" class="btn btn-green" style="font-size:.78rem;padding:5px 12px">&#128202; Download Excel</button>
-        <button id="hod-close-btn" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#888">&times;</button>
+  <section class="tab" id="tab-onhand" hidden>
+    <p class="muted" style="margin:0;max-width:70ch">Everything Blitz still physically has, added up per item across all projects: what is in the store plus what technicians are holding. Stock already used on a site is not counted.</p>
+    <div class="bar">
+      <label class="grow">Search<input id="oh-q" type="search" placeholder="Code or description"></label>
+      <label>Stock type<select id="oh-fc"></select></label>
+      <label>Show<select id="oh-fs"><option value="">Everything on hand</option><option value="store">In store only</option><option value="tech">With technicians only</option></select></label>
+    </div>
+    <div class="panel scroll" id="oh-box"></div>
+  </section>
+
+  <section class="tab" id="tab-techs" hidden>
+    <p class="muted" style="margin:0;max-width:70ch">Who is responsible for what. Stock stays against a technician until it is booked to a site or returned to the store, and a handover stays "awaiting signature" until the signed slip is uploaded.</p>
+    <div id="tech-box" style="display:flex;flex-direction:column;gap:12px"></div>
+  </section>
+
+  <section class="tab" id="tab-assets" hidden>
+    <p class="muted" style="margin:0;max-width:70ch">The asset register: tools and equipment that stay with Blitz, such as splicers, OTDRs, ladders and laptops. Each asset keeps its serial number, photos and who is responsible for it.</p>
+    <div class="bar">
+      <label class="grow">Search<input id="as-q" type="search" placeholder="Name, serial number or asset tag"></label>
+      <label>Type<select id="as-ft"></select></label>
+      <label>Assigned to<select id="as-fh"></select></label>
+      <label>Condition<select id="as-fc"><option value="">Any condition</option></select></label>
+      <button class="primary" id="as-new">Add asset</button>
+      <button id="as-rep">Download asset report</button>
+    </div>
+    <div id="as-sum" class="small muted"></div>
+    <div class="panel scroll" id="as-box"></div>
+  </section>
+
+  <section class="tab" id="tab-handover" hidden>
+    <div class="panel pad" style="display:flex;flex-direction:column;gap:14px">
+      <h2>Hand stock to a technician</h2>
+      <div class="grid2">
+        <label>Technician or team member<input id="ho-tech" list="dl-tech" placeholder="Full name"></label>
+        <label>Date<input id="ho-date" type="date"></label>
+        <label>Note (optional)<input id="ho-note" placeholder="e.g. vehicle, job reference"></label>
+      </div>
+      <div class="bar">
+        <label class="grow">Find item<input id="ho-q" type="search" placeholder="Code or description"></label>
+        <label>Project<select id="ho-fq"></select></label>
+        <label>Stock type<select id="ho-fc"></select></label>
+      </div>
+      <div class="scroll" id="ho-box"></div>
+      <div class="bar" style="justify-content:space-between;align-items:center">
+        <span id="ho-sum" class="muted">No items selected</span>
+        <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="err" id="ho-err"></span><button class="primary" id="ho-go">Issue stock and create slip</button></span>
       </div>
     </div>
-    <div class="hod-month-row">
-      <label>Month A <input type="month" id="hod-month-a"></label>
-      <label>Month B <input type="month" id="hod-month-b"></label>
+    <h2>Handover slips</h2>
+    <div class="panel scroll" id="ho-list"></div>
+  </section>
+
+  <section class="tab" id="tab-activity" hidden>
+    <h2>Used per site</h2>
+    <div class="panel scroll" id="site-box"></div>
+    <h2>All movements</h2>
+    <div class="panel scroll" id="act-box"></div>
+  </section>
+
+  <section class="tab" id="tab-pos" hidden>
+    <p class="muted" style="margin:0;max-width:70ch">Purchase orders: who each PO has been sent to, and whether it has been paid. Change the status straight in the table, or open a PO to edit it and attach the PO document.</p>
+    <div class="figs" id="po-figs" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="fig"><span class="k">Purchase orders</span><span class="v num" id="po-f1">–</span><span class="s" id="po-f1s">&nbsp;</span></div>
+      <div class="fig"><span class="k">Not sent yet</span><span class="v num" id="po-f2">–</span><span class="s" id="po-f2s">&nbsp;</span></div>
+      <div class="fig"><span class="k">Not paid</span><span class="v num" id="po-f3">–</span><span class="s" id="po-f3s">&nbsp;</span></div>
+      <div class="fig"><span class="k">Paid</span><span class="v num" id="po-f4">–</span><span class="s" id="po-f4s">&nbsp;</span></div>
     </div>
-    <div id="hod-content"></div>
-  </div>
+    <div class="bar">
+      <label class="grow">Search<input id="po-q" type="search" placeholder="PO number, supplier or description"></label>
+      <label>Sent to<select id="po-fs"><option value="">Anyone</option><option value="none">Not sent yet</option><option>CVA</option><option>Supplier</option></select></label>
+      <label>Payment<select id="po-fp"><option value="">Paid and not paid</option><option value="unpaid">Not paid</option><option value="paid">Paid</option></select></label>
+      <button class="primary" id="po-new">Add PO</button>
+    </div>
+    <div class="panel scroll" id="po-box"></div>
+  </section>
+
+  <section class="tab" id="tab-quotes" hidden>
+    <h2>Projects and invoices</h2>
+    <p class="muted" style="margin:0;max-width:65ch">Set the site type for each project, and mark a project completed when the job is done. Archive an invoice to take it out of the stock figures without deleting anything; you can restore it later. Whatever is still in the store for a completed project becomes leftover stock that any new site can use.</p>
+    <div class="panel scroll" id="quote-list"></div>
+    <div id="quote-archived"></div>
+    <div class="panel pad" style="display:flex;flex-direction:column;gap:14px">
+      <h2>Import an invoice</h2>
+      <p class="muted" style="margin:0;max-width:65ch">Choose the supplier's invoice PDF. The lines are read into a table you can correct before anything is saved. Cable and duct quoted per 100&nbsp;m are converted to metres.</p>
+      <div class="bar">
+        <label>Quotation PDF<input id="imp-file" type="file" accept="application/pdf,.pdf"></label>
+        <button id="imp-paste-toggle">Paste text instead</button>
+        <button id="imp-store">Add stock without an invoice</button>
+      </div>
+      <div id="imp-paste" hidden style="display:flex;flex-direction:column;gap:8px">
+        <label>Invoice text<textarea id="imp-text" rows="6" placeholder="Copy the whole quotation and paste it here"></textarea></label>
+        <div><button id="imp-read">Read pasted text</button></div>
+      </div>
+      <div class="err" id="imp-err"></div>
+      <div id="imp-review" hidden style="display:flex;flex-direction:column;gap:12px">
+        <div class="grid2">
+          <label><span id="imp-no-l">Invoice number</span><input id="imp-no"></label>
+          <label id="imp-sup-w">Supplier<input id="imp-sup"></label>
+          <label><span id="imp-date-l">Invoice date</span><input id="imp-date"></label>
+          <label><span id="imp-site-l">Project / site</span><input id="imp-site"></label>
+        </div>
+        <div id="imp-xl-w" hidden style="display:flex;flex-direction:column;gap:8px">
+          <label>Paste rows from Excel (optional)<textarea id="imp-xl" rows="4" placeholder="Copy the rows in Excel and paste here. Columns in this order: Code, Description, Quantity, Unit, Unit price. Unit and price can be left out."></textarea></label>
+          <div><button id="imp-xl-go">Add pasted rows to the table</button></div>
+        </div>
+        <div class="scroll"><table id="imp-table"></table></div>
+        <div class="bar" style="justify-content:space-between;align-items:center">
+          <span id="imp-check" class="small"></span>
+          <span style="display:flex;gap:8px"><button id="imp-add">Add a line</button><button class="primary" id="imp-save">Save invoice to stock</button></span>
+        </div>
+      </div>
+    </div>
+    <div class="panel pad" style="display:flex;flex-direction:column;gap:12px">
+      <h2>Backup</h2>
+      <p class="muted" style="margin:0;max-width:70ch">A backup is one zip file holding everything: stock, handovers, the asset register, photos and signed slips. Download one regularly and keep it somewhere safe, such as OneDrive.</p>
+      <div class="bar" style="align-items:center"><button class="primary" id="bu-go">Download backup now</button><span class="small muted" id="bu-info"></span></div>
+      <h3>Restore from a backup</h3>
+      <p class="muted" style="margin:0;max-width:70ch">Restoring replaces everything on the site with what is in the backup file. Anything entered after that backup was made is lost, so only do this to recover from a problem.</p>
+      <div class="bar" style="align-items:flex-end"><label style="max-width:360px">Backup zip file<input id="bu-file" type="file" accept=".zip,application/zip"></label><button class="danger" id="bu-restore" hidden>Restore this backup</button></div>
+      <div class="err" id="bu-err"></div>
+    </div>
+  </section>
 </div>
 
-<!-- IMPORT MNT -->
-<div class="ov" id="imp-ov">
-  <div class="imp-mdl">
-    <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-      <h2 style="font-size:1rem">&#128202; Import from Excel / CSV</h2>
-      <button id="imp-close-btn" style="background:none;border:none;font-size:1.3rem;cursor:pointer">&times;</button>
-    </div>
-    <p style="font-size:.82rem;color:#666;margin-bottom:10px">Column headers matched automatically.</p>
-    <input type="file" id="imp-file" accept=".xlsx,.xls,.csv">
-    <div class="imp-prev" id="imp-prev"></div>
-    <div id="imp-status" style="font-size:.82rem;margin:6px 0"></div>
-    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:10px">
-      <button class="btn btn-grey" id="imp-cancel-btn">Cancel</button>
-      <button class="btn btn-blue" id="imp-ok" style="display:none">Import</button>
-    </div>
+<datalist id="dl-tech"></datalist>
+<datalist id="dl-site"></datalist>
+<datalist id="dl-stype"></datalist>
+
+<dialog id="dlg-book"><div class="pad">
+  <div class="dhead"><div><h2 id="bk-title"></h2><div class="code" id="bk-code"></div></div><button class="sm" data-close>Close</button></div>
+  <div class="kv" id="bk-kv"></div>
+  <div class="seg" id="bk-mode"><button data-mode="use" aria-pressed="true">Used on site</button><button data-mode="return" aria-pressed="false">Returned to store</button></div>
+  <div class="grid2">
+    <label>Taken from<select id="bk-from"></select></label>
+    <label id="bk-qty-l">Quantity<input id="bk-qty" type="number" min="0" step="any" inputmode="decimal"></label>
+    <label id="bk-site-l">Site<input id="bk-site" list="dl-site"></label>
+    <label>Date<input id="bk-date" type="date"></label>
   </div>
-</div>
+  <div class="grid2"><label>Note (optional)<input id="bk-note"></label><label>Stock type<select id="bk-cat"></select></label></div>
+  <div class="bar" style="justify-content:space-between;align-items:center"><span class="err" id="bk-err"></span><button class="primary" id="bk-save">Save</button></div>
+  <div id="bk-hist"></div>
+</div></dialog>
 
-<!-- IMPORT FTTB -->
-<div class="ov" id="fttb-imp-ov">
-  <div class="imp-mdl">
-    <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-      <h2 style="font-size:1rem">&#128202; Import FTTB from Excel / CSV</h2>
-      <button id="fttb-imp-close-btn" style="background:none;border:none;font-size:1.3rem;cursor:pointer">&times;</button>
-    </div>
-    <input type="file" id="fttb-imp-file" accept=".xlsx,.xls,.csv">
-    <div class="imp-prev" id="fttb-imp-prev"></div>
-    <div id="fttb-imp-status" style="font-size:.82rem;margin:6px 0"></div>
-    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:10px">
-      <button class="btn btn-grey" id="fttb-imp-cancel-btn">Cancel</button>
-      <button class="btn btn-blue" id="fttb-imp-ok" style="display:none">Import</button>
-    </div>
+<dialog id="dlg-asset"><div class="pad">
+  <div class="dhead"><div><h2 id="ad-title"></h2><div class="code" id="ad-id"></div></div><button class="sm" data-close>Close</button></div>
+  <div class="grid2">
+    <label>Asset name<input id="ad-name" placeholder="e.g. Fusion splicer"></label>
+    <label>Type<input id="ad-type" list="dl-atype" placeholder="e.g. Splicer"></label>
+    <label>Make and model<input id="ad-make"></label>
+    <label>Serial number<input id="ad-serial"></label>
+    <label>Asset tag (optional)<input id="ad-tag"></label>
+    <label>Assigned to<input id="ad-holder" list="dl-tech" placeholder="Name, or leave empty for store"></label>
+    <label>Location / region<input id="ad-loc" list="dl-aloc"></label>
+    <label>Condition<select id="ad-cond"></select></label>
+    <label>Date bought (optional)<input id="ad-date" type="date"></label>
+    <label>Value in rand (optional)<input id="ad-value" type="number" min="0" step="any" inputmode="decimal"></label>
   </div>
-</div>
+  <label>Notes<textarea id="ad-notes" rows="2"></textarea></label>
+  <div class="bar" style="justify-content:space-between;align-items:center"><button class="danger sm" id="ad-del">Remove this asset</button><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="err" id="ad-err"></span><button class="primary" id="ad-save">Save asset</button></span></div>
+  <div id="ad-more" style="display:flex;flex-direction:column;gap:12px">
+    <h3>Photos</h3>
+    <div class="photos" id="ad-photos"></div>
+    <label style="max-width:420px">Add photos (serial plate, the asset itself, any damage)<input id="ad-file" type="file" accept="image/*" multiple></label>
+    <div id="ad-hist"></div>
+  </div>
+</div></dialog>
+<datalist id="dl-atype"></datalist>
+<datalist id="dl-aloc"></datalist>
 
-</div><!-- #app -->
+<dialog id="dlg-po"><div class="pad">
+  <div class="dhead"><div><h2 id="pd-title"></h2><div class="code" id="pd-sub"></div></div><button class="sm" data-close>Close</button></div>
+  <div class="grid2">
+    <label>PO number<input id="pd-no"></label>
+    <label>PO date<input id="pd-date" type="date"></label>
+    <label>Supplier<input id="pd-sup" list="dl-posup"></label>
+    <label>Amount excl. VAT (R)<input id="pd-amt" type="number" min="0" step="any" inputmode="decimal"></label>
+    <label>Project / site<input id="pd-site" list="dl-site"></label>
+    <label>Linked invoice (optional)<select id="pd-inv"></select></label>
+    <label>Sent to<select id="pd-sent"><option value="">Not sent yet</option><option>CVA</option><option>Supplier</option></select></label>
+    <label>Date sent<input id="pd-sentd" type="date"></label>
+    <label>Payment<select id="pd-paid"><option value="">Not paid</option><option value="paid">Paid</option></select></label>
+    <label>Date paid<input id="pd-paidd" type="date"></label>
+  </div>
+  <label>What it is for<input id="pd-desc" placeholder="e.g. Drop cable and enclosures for Begal Heights"></label>
+  <label>Notes<textarea id="pd-notes" rows="2"></textarea></label>
+  <div class="bar" style="justify-content:space-between;align-items:center"><button class="danger sm" id="pd-del">Delete this PO</button><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="err" id="pd-err"></span><button class="primary" id="pd-save">Save PO</button></span></div>
+  <div id="pd-more" style="display:flex;flex-direction:column;gap:10px">
+    <h3>PO document</h3>
+    <div id="pd-doc"></div>
+    <label style="max-width:420px"><span id="pd-up-l">Attach the PO (PDF or photo)</span><input id="pd-file" type="file" accept="application/pdf,.pdf,image/*"></label>
+  </div>
+</div></dialog>
+<datalist id="dl-posup"></datalist>
 
-<script type="module" src="js/app.js"></script>
+<dialog id="dlg-slip"><div class="pad">
+  <div class="dhead"><h2 id="sl-title"></h2><button class="sm" data-close>Close</button></div>
+  <div class="slip" id="sl-body"></div>
+  <div class="panel pad" style="display:flex;flex-direction:column;gap:10px">
+    <h3>Signed slip</h3>
+    <div id="sl-signed"></div>
+    <label style="max-width:420px"><span id="sl-up-l">Upload the signed slip (photo or PDF)</span><input id="sl-file" type="file" accept="image/*,application/pdf,.pdf"></label>
+  </div>
+  <div class="bar" style="justify-content:space-between;align-items:center">
+    <button class="danger sm" id="sl-del">Remove this handover</button>
+    <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="err" id="sl-err"></span><button id="sl-pdf">Download PDF</button><button class="primary" id="sl-print">Print slip</button></span>
+  </div>
+</div></dialog>
+
+<div id="toast" hidden role="status"></div>
+
+<script src="/static/vendor/jspdf.umd.min.js"></script>
+<script src="/static/vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="/static/vendor/pdf.min.js"></script>
+<script src="/static/vendor/pdf.worker.min.js"></script>
+<script>
+/*PURE-START*/
+const COMPANY = { name: "Blitz Fibre", legal: "Blitz PE (Pty) Ltd", address: "26 Centenary Road, Lorraine, Gqeberha 6001" };
+const ACK = (name) => "I, " + name + ", confirm that I have received the stock listed above in good condition and in the quantities shown. " +
+  "From the date of this handover the stock is in my care and I am responsible for its safekeeping and correct use. " +
+  "I will account for every item by booking it to the site where it is installed or by returning it to the " + COMPANY.name + " store, " +
+  "and I will report any loss, theft or damage to the office immediately.";
+
+const CATS = ["Cable","Duct & conduit","Chambers & manholes","Enclosures & boxes","Splitters","Joints & seal kits","Fixings & consumables","Other"];
+function catOf(it){ if (it.cat) return it.cat; const d = (it.desc||"").toUpperCase();
+  if (/CABLE/.test(d)) return "Cable";
+  if (/SPLITTER/.test(d)) return "Splitters";
+  if (/DOME|SEAL KIT|PORT KIT|JOINT/.test(d)) return "Joints & seal kits";
+  if (/CHAMBER|MANHOLE/.test(d)) return "Chambers & manholes";
+  if (/COUPLING|END CAP|SADDLE|TAPE|FOAM|NAIL|SCREW|ALCOHOL|BRADY|ANCHOR/.test(d)) return "Fixings & consumables";
+  if (/DUCT|CONDUIT/.test(d)) return "Duct & conduit";
+  if (/ENCL|INSP BOX|LID/.test(d)) return "Enclosures & boxes";
+  return "Other"; }
+function money(n){ const s = (Math.round((n||0)*100)/100).toFixed(2).split("."); return "R " + s[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ") + "." + s[1]; }
+function qf(n){ return (Math.round((n||0)*100)/100).toLocaleString("en-US",{maximumFractionDigits:2}).replace(/,/g," "); }
+function toNum(s){ return parseFloat(String(s).replace(/[,\s]/g,"")) || 0; }
+
+// Group pdf.js text items into visual lines (top to bottom, left to right).
+function linesFromPdfItems(items){
+  const its = items.filter(i => i.str && i.str.trim()).map(i => ({ x:i.transform[4], y:i.transform[5], s:i.str.trim() }));
+  its.sort((a,b) => (b.y - a.y) || (a.x - b.x));
+  const rows = [];
+  for (const it of its){ const r = rows[rows.length-1]; if (r && Math.abs(r.y - it.y) < 3) r.c.push(it); else rows.push({ y:it.y, c:[it] }); }
+  return rows.map(r => r.c.sort((a,b)=>a.x-b.x).map(c=>c.s).join(" "));
+}
+
+// Read a supplier quotation (one text line per printed line) into a header and item lines.
+function parseQuote(lines){
+  const D = "(\\d[\\d,]*\\.\\d{2})";
+  const ROW = new RegExp("^(\\S+)\\s+(.+?)\\s+" + D + "\\s+(?:([A-Za-z0-9]{1,6})\\s+)?" + D + "\\s+" + D + "\\s+" + D + "$");
+  const out = { docNo:"", date:"", supplier:"", orderNo:"", subtotal:null, items:[] };
+  let inTable = false, last = null, orderOpen = false;
+  lines = lines.map(l => l.replace(/\s+/g," ").trim()).filter(Boolean);
+  for (let i=0;i<lines.length;i++){
+    const l = lines[i];
+    let m;
+    if (!out.supplier && i < 3){ const s = l.replace(/Copy Quotation|Quotation/i,"").trim(); if (s) out.supplier = s; }
+    if (!out.docNo && (m = l.match(/Document No\s+(\S+)/))) out.docNo = m[1];
+    if (!out.date && (m = l.match(/Date\s+(\d{2}\/\d{2}\/\d{4})/))) out.date = m[1];
+    if ((m = l.match(/Sub Total\s+(\d[\d,]*\.\d{2})/))) out.subtotal = toNum(m[1]);
+    if (/^Code\s+Description/.test(l)){ inTable = true; orderOpen = false; last = null; continue; }
+    if (/^TERMS/.test(l)){ inTable = false; last = null; continue; }
+    if (!inTable){
+      if (!out.orderNo && (m = l.match(/^(\S+)\s+(.+?)\s+[NY]\s+\d{6,}/))){ out.orderNo = m[2]; orderOpen = true; }
+      else if (orderOpen && l.length < 40 && !/\d{4,}/.test(l)){ out.orderNo += " " + l; orderOpen = false; }
+      continue;
+    }
+    if (/^--|^==|CLIENT COLLECTING/.test(l)) { last = null; continue; }
+    if ((m = l.match(ROW))){
+      let qty = toNum(m[3]), unit = (m[4]||"").toLowerCase(), price = toNum(m[6]); const total = toNum(m[7]);
+      if (unit === "100m"){ qty *= 100; price /= 100; unit = "m"; }
+      else if (unit === "100"){ unit = "x100"; }
+      else unit = "ea";
+      last = { code:m[1], desc:m[2], qty, unit, price, total };
+      out.items.push(last);
+    } else if (last){ last.desc += " " + l; }
+  }
+  out.orderNo = out.orderNo.replace(/\s*\/\s*/g," / ").trim();
+  return out;
+}
+
+// Where every unit of an item is now. tech "" means the store.
+function compute(items, moves){
+  const by = {};
+  for (const it of items) by[it.id] = { item:it, issued:0, used:0, usedStore:0, tech:{}, site:{} };
+  for (const m of moves){
+    const b = by[m.itemId]; if (!b) continue;
+    const t = m.tech || "";
+    if (m.type === "issue"){ b.tech[t] = (b.tech[t]||0) + m.qty; }
+    else if (m.type === "return"){ b.tech[t] = (b.tech[t]||0) - m.qty; }
+    else if (m.type === "use"){ b.used += m.qty; b.site[m.site||"Unspecified"] = (b.site[m.site||"Unspecified"]||0) + m.qty;
+      if (t) b.tech[t] = (b.tech[t]||0) - m.qty; else b.usedStore += m.qty; }
+  }
+  for (const id in by){ const b = by[id];
+    b.withTech = Object.values(b.tech).reduce((a,v)=>a+v,0);
+    b.store = b.item.qty - b.withTech - b.used;
+    b.left = b.item.qty - b.used;
+  }
+  return by;
+}
+
+// Printable handover slip. J = jsPDF constructor, at = autoTable(doc, options).
+function buildSlip(J, at, ho){
+  const doc = new J({ unit:"mm", format:"a4" }); const L = 15, W = 180; let y = 18;
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(196,30,88); doc.text(COMPANY.name.toUpperCase(), L, y); doc.setTextColor(0);
+  doc.setFontSize(15); doc.text("STOCK HANDOVER NOTE", L+W, y, { align:"right" });
+  y += 6; doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90);
+  doc.text(COMPANY.legal + "  |  " + COMPANY.address, L, y);
+  doc.setTextColor(0); y += 4; doc.setDrawColor(196,30,88); doc.setLineWidth(.8); doc.line(L, y, L+W, y); doc.setDrawColor(0); doc.setLineWidth(.3); y += 8;
+  doc.setFontSize(10);
+  const pair = (k, v, x, yy) => { doc.setFont("helvetica","bold"); doc.text(k, x, yy); doc.setFont("helvetica","normal"); doc.text(String(v||"-"), x+28, yy); };
+  pair("Handover no.", ho.no, L, y); pair("Date", ho.date, L+100, y); y += 6;
+  pair("Issued to", ho.tech, L, y); pair("Issued by", ho.by, L+100, y); y += 6;
+  if (ho.note){ pair("Note", ho.note, L, y); y += 6; }
+  let total = 0;
+  const body = ho.lines.map((l,i) => { const v = l.qty*l.price; total += v; return [i+1, l.code, l.desc, l.quote||"", qf(l.qty), l.unit, money(l.price), money(v)]; });
+  at(doc, { startY:y+2, margin:{ left:L, right:L }, head:[["#","Code","Description","Invoice","Qty","Unit","Unit value","Value"]], body,
+    foot:[[{ content:"Total value of stock handed over (excl. VAT)", colSpan:7, styles:{ halign:"right" } }, money(total)]],
+    styles:{ font:"helvetica", fontSize:8.5, cellPadding:1.8, lineColor:[190,190,190], lineWidth:.1, textColor:20 },
+    headStyles:{ fillColor:[43,14,26], textColor:255 }, footStyles:{ fillColor:[248,232,238], textColor:20, fontStyle:"bold" },
+    columnStyles:{ 0:{cellWidth:8}, 1:{cellWidth:29}, 3:{cellWidth:20}, 4:{halign:"right",cellWidth:14}, 5:{cellWidth:12}, 6:{halign:"right",cellWidth:22}, 7:{halign:"right",cellWidth:24} },
+    theme:"grid" });
+  y = doc.lastAutoTable.finalY + 10;
+  if (y > 215){ doc.addPage(); y = 20; }
+  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text("Acknowledgement of responsibility", L, y); y += 6;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  const txt = doc.splitTextToSize(ACK(ho.tech), W); doc.text(txt, L, y); y += txt.length*4.8 + 18;
+  const sig = (label, name, x) => { doc.line(x, y, x+80, y); doc.setFontSize(9); doc.text(label, x, y+4.5); doc.setFontSize(10); doc.text(name||"", x, y-2);
+    doc.setFontSize(9); doc.text("Signature: ______________________", x, y+14); doc.text("Date: ____________________", x, y+22); };
+  sig("Received by (technician)", ho.tech, L); sig("Issued by (" + COMPANY.name + ")", ho.by, L+100);
+  return doc;
+}
+// Management report: stock on hand, what each person holds, and the asset register. R is plain data.
+function buildReport(J, at, R){
+  const doc = new J({ unit:"mm", format:"a4", orientation:"landscape" }), L = 12, W = 273, PINK = [196,30,88], DARK = [43,14,26];
+  const base = { margin:{ left:L, right:L, bottom:14 }, theme:"grid", styles:{ font:"helvetica", fontSize:8, cellPadding:1.6, lineColor:[200,200,200], lineWidth:.1, textColor:20, overflow:"linebreak" },
+    headStyles:{ fillColor:DARK, textColor:255 }, footStyles:{ fillColor:[248,232,238], textColor:20, fontStyle:"bold" }, showFoot:"lastPage" };
+  let y = 16;
+  const need = (h) => { if (y + h > 192){ doc.addPage(); y = 16; } };
+  const h1 = (t) => { need(24); doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(...PINK); doc.text(t, L, y); doc.setTextColor(0); y += 2; doc.setDrawColor(...PINK); doc.setLineWidth(.5); doc.line(L, y, L+W, y); y += 5; };
+  const note = (t) => { doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(90); const ls = doc.splitTextToSize(t, W); need(ls.length*4+2); doc.text(ls, L, y); doc.setTextColor(0); y += ls.length*4 + 2; };
+  const table = (o) => { at(doc, { ...base, startY:y, ...o }); y = doc.lastAutoTable.finalY + 7; };
+  const R_ = { halign:"right" };
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(20); doc.setTextColor(...PINK); doc.text(COMPANY.name.toUpperCase(), L, y);
+  const AO = R.only === "assets", TITLE = AO ? "asset report" : "stock and asset report";
+  doc.setTextColor(0); doc.setFontSize(15); doc.text(TITLE.toUpperCase(), L+W, y, { align:"right" }); y += 6;
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90);
+  doc.text(COMPANY.legal + "  |  " + COMPANY.address, L, y); doc.text("Position as at " + R.date + (R.by ? "  |  Prepared by " + R.by : ""), L+W, y, { align:"right" });
+  doc.setTextColor(0); y += 8;
+  if (AO) table({ theme:"plain", styles:{ font:"helvetica", fontSize:9, cellPadding:2.2 }, body:[
+    [{ content:"Assets on register", styles:{ fontStyle:"bold" } }, String(R.sum.assets), { content:"Assigned to people", styles:{ fontStyle:"bold" } }, R.sum.assigned + " assets, held by " + R.sum.holders + (R.sum.holders === 1 ? " person" : " people")],
+    [{ content:"Total recorded value", styles:{ fontStyle:"bold" } }, money(R.sum.assetValue), { content:"In the store / unassigned", styles:{ fontStyle:"bold" } }, String(R.sum.assets - R.sum.assigned)],
+    [{ content:"Without a serial number", styles:{ fontStyle:"bold" } }, String(R.sum.noSerial), { content:"Without a photo", styles:{ fontStyle:"bold" } }, String(R.sum.noPhoto)]],
+    columnStyles:{ 0:{ cellWidth:66 }, 1:{ cellWidth:70 }, 2:{ cellWidth:62 } } });
+  else table({ theme:"plain", styles:{ font:"helvetica", fontSize:9, cellPadding:2.2 }, body:[
+    [{ content:"Stock on hand (store + technicians)", styles:{ fontStyle:"bold" } }, money(R.sum.store + R.sum.tech), { content:"Assets on register", styles:{ fontStyle:"bold" } }, R.sum.assets + " (recorded value " + money(R.sum.assetValue) + ")"],
+    [{ content:"In the store", styles:{ fontStyle:"bold" } }, money(R.sum.store), { content:"Assets without a serial number", styles:{ fontStyle:"bold" } }, String(R.sum.noSerial)],
+    [{ content:"With technicians", styles:{ fontStyle:"bold" } }, money(R.sum.tech) + " held by " + R.sum.people + (R.sum.people === 1 ? " person" : " people"), { content:"Handover slips not yet signed", styles:{ fontStyle:"bold" } }, R.sum.unsigned + " of " + R.sum.slips],
+    [{ content:"Used on site to date", styles:{ fontStyle:"bold" } }, money(R.sum.used), "", ""]],
+    columnStyles:{ 0:{ cellWidth:66 }, 1:{ cellWidth:70 }, 2:{ cellWidth:62 } } });
+  if (!AO){ note("Stock values are at invoiced cost, excluding VAT. Stock already used on a site is not part of stock on hand.");
+  h1("1. Stock on hand, by item"); }
+  if (AO){} else if (R.onhand.length) table({ head:[["Code","Description","Type","In store","With technicians","Total on hand","Unit","Value on hand","Held by"]],
+    body:R.onhand.map(o => [o.code, o.desc, o.cat, qf(o.store), qf(o.tech), qf(o.store + o.tech), o.unit, money(o.value), o.who]),
+    foot:[[{ content:"Total value of stock on hand", colSpan:7, styles:R_ }, { content:money(R.sum.store + R.sum.tech), styles:R_ }, ""]],
+    columnStyles:{ 0:{ cellWidth:30 }, 2:{ cellWidth:32 }, 3:{ ...R_, cellWidth:17 }, 4:{ ...R_, cellWidth:22 }, 5:{ ...R_, cellWidth:20, fontStyle:"bold" }, 6:{ cellWidth:11 }, 7:{ ...R_, cellWidth:26 }, 8:{ cellWidth:42 } } });
+  else note("No stock on hand.");
+
+  h1(AO ? "1. Assets by person" : "2. What each person is responsible for");
+  const PP = AO ? R.people.filter(P => P.assets.length) : R.people;
+  if (!PP.length) note(AO ? "No assets are assigned to anyone." : "No stock or assets are assigned to anyone.");
+  for (const P of PP){
+    need(26); doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text(P.name, L, y);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.text(AO ? P.assets.length + " asset" + (P.assets.length === 1 ? "" : "s") + "   |   Recorded value " + money(P.assets.reduce((x,a) => x + a.value, 0)) : "Stock held " + money(P.value) + "   |   Assets " + P.assets.length + "   |   Slips: " + (P.slips || "none"), L+W, y, { align:"right" }); y += 3;
+    if (!AO && P.items.length) table({ head:[["Stock code","Description","Project","Qty held","Unit","Value","Held since","Days"]],
+      body:P.items.map(i => [i.code, i.desc, i.project, qf(i.qty), i.unit, money(i.value), i.since, String(i.days)]),
+      columnStyles:{ 0:{ cellWidth:32 }, 2:{ cellWidth:48 }, 3:{ ...R_, cellWidth:20 }, 4:{ cellWidth:12 }, 5:{ ...R_, cellWidth:28 }, 6:{ cellWidth:24 }, 7:{ ...R_, cellWidth:14 } } });
+    if (P.assets.length) table({ head:[["Asset no.","Asset","Type","Make and model","Serial number","Tag","Condition","Value"]],
+      body:P.assets.map(a => [a.id, a.name, a.type, a.make, a.serial || "MISSING", a.tag, a.cond, a.value ? money(a.value) : "-"]),
+      columnStyles:{ 0:{ cellWidth:22 }, 2:{ cellWidth:34 }, 4:{ cellWidth:48, fontStyle:"bold" }, 5:{ cellWidth:24 }, 6:{ cellWidth:26 }, 7:{ ...R_, cellWidth:26 } } });
+    if (!P.items.length && !P.assets.length){ y += 3; note("Holding nothing at present."); }
+  }
+
+  h1(AO ? "2. Full asset register" : "3. Asset register");
+  if (R.assets.length) table({ head:[["Asset no.","Asset","Type","Make and model","Serial number","Tag","Assigned to","Location","Condition","Photos","Value"]],
+    body:R.assets.map(a => [a.id, a.name, a.type, a.make, a.serial || "MISSING", a.tag, a.holder || "Store", a.loc, a.cond, String(a.photos), a.value ? money(a.value) : "-"]),
+    foot:[[{ content:"Total recorded value of assets", colSpan:10, styles:R_ }, { content:money(R.sum.assetValue), styles:R_ }]],
+    columnStyles:{ 0:{ cellWidth:20 }, 2:{ cellWidth:26 }, 4:{ cellWidth:40, fontStyle:"bold" }, 5:{ cellWidth:20 }, 6:{ cellWidth:30 }, 7:{ cellWidth:24 }, 8:{ cellWidth:22 }, 9:{ ...R_, cellWidth:14 }, 10:{ ...R_, cellWidth:26 } } });
+  else note("No assets have been recorded.");
+
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++){ doc.setPage(i); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(120);
+    doc.text(COMPANY.name + " " + TITLE + ", " + R.date, L, 203); doc.text("Page " + i + " of " + n, L+W, 203, { align:"right" }); }
+  return doc;
+}
+/*PURE-END*/
+
+const $ = (id) => document.getElementById(id);
+const h = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+const S = { rawItems:[], pos:[], poId:null, assets:[], assetId:null, impMode:"quote", quotes:[], items:[], moves:[], handovers:[], ready:{}, draft:{}, imp:null, bookId:null, mode:"use", slipId:null };
+let db = null, raf = 0, toastT = 0;
+
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+function fail(e){ const c = e && e.code; toast(c === "signed_out" ? "You were signed out. Sign in again." : "That did not save. Check your connection and try again."); }
+function myName(){ const n = $("me").value.trim(); if (!n){ $("me").focus(); toast("Enter your name at the top first, so the entry shows who made it."); } return n; }
+function quoteOf(id){ return S.quotes.find(q => q.id === id); }
+function chip(qid){ const q = quoteOf(qid); if (!q) return ""; return '<span class="chip"><i style="background:var(--f' + ((q.colour||0)%6+1) + ')"></i>' + h(q.site || q.id) + "</span>"; }
+function isOver(b){ const q = quoteOf(b.item.quoteId); return !!q && q.status === "done" && b.store > 0; }
+function daysSince(d){ const t = Date.parse(d); return isNaN(t) ? 0 : Math.max(0, Math.floor((Date.now() - t) / 86400000)); }
+const LATE_DAYS = 14;
+const ATYPES = ["Fusion splicer","OTDR","Power meter","Light source","VFL","Cleaver","Blowing machine","Ladder","Generator","Tool kit","Laptop","Phone","Tablet","Vehicle","Other"];
+const CONDS = ["Good","Fair","Needs repair","Lost or stolen","Written off"];
+const condClass = (c) => c === "Good" ? "ok" : c === "Fair" || !c ? "wait" : "late";
+const norm = (v) => String(v||"").trim().toLowerCase();
+function schedule(){ if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+
+/* ---------- rendering ---------- */
+function render(){
+  const act = document.activeElement, keep = act && act.id && !act.closest("dialog") ? { id:act.id, s:act.selectionStart, e:act.selectionEnd } : null;
+  const loaded = ["quotes","items","moves","handovers"].every(k => S.ready[k]);
+  const arch = new Set(S.quotes.filter(q => q.archived).map(q => q.id));
+  S.items = S.rawItems.filter(i => !arch.has(i.quoteId));
+  const C = compute(S.items, S.moves), rows = Object.values(C);
+  let tv=0, sv=0, hv=0, uv=0, ov=0, nStore=0, nUsed=0; const techs = new Set(), sites = new Set();
+  for (const b of rows){ const p = b.item.price; tv += b.item.qty*p; sv += b.store*p; hv += b.withTech*p; uv += b.used*p;
+    if (b.store > 0) nStore++; if (b.used > 0) nUsed++; if (isOver(b)) ov += b.store*p;
+    for (const t in b.tech) if (b.tech[t] > 0) techs.add(t); for (const s in b.site) sites.add(s); }
+  if (loaded){
+    $("f-total").textContent = money(tv); $("f-total-s").textContent = S.items.length + " lines on " + S.quotes.filter(q => !q.archived).length + " invoice" + (S.quotes.filter(q => !q.archived).length===1?"":"s") + ", excl. VAT";
+    $("f-store").textContent = money(sv); $("f-store-s").textContent = ov > 0 ? money(ov) + " of it is free to use on any site" : nStore + " lines with stock";
+    $("f-tech").textContent = money(hv); const unsigned = S.handovers.filter(x => !x.signed).length;
+    $("f-tech-s").textContent = (techs.size ? techs.size + " " + (techs.size===1?"person":"people") + " holding stock" : "Nothing held") + (unsigned ? ", " + unsigned + " slip" + (unsigned===1?"":"s") + " unsigned" : "");
+    $("f-used").textContent = money(uv); $("f-used-s").textContent = sites.size ? "across " + sites.size + " site" + (sites.size===1?"":"s") : "Nothing booked yet";
+  }
+  const ex = S.handovers.find(x => x.example), bn = $("banner");
+  bn.hidden = !ex;
+  if (ex) bn.innerHTML = '<span><b>' + h(ex.id) + ' is an example entry</b> so you can see how a handover and site usage look. Remove it before you start using this for real.</span><button class="sm" id="ex-del">Remove example</button>';
+
+  const copts = '<option value="">All types</option>' + CATS.map(c => "<option>" + h(c) + "</option>").join("");
+  for (const id of ["fc","ho-fc","oh-fc"]){ const el = $(id); if (!el.options.length) el.innerHTML = copts; }
+  if (!$("bk-cat").options.length) $("bk-cat").innerHTML = CATS.map(c => "<option>" + h(c) + "</option>").join("");
+  const stypes = [...new Set(S.quotes.map(q => q.siteType).filter(Boolean))].sort();
+  { const el = $("ft"), v = el.value; el.innerHTML = '<option value="">All site types</option>' + stypes.map(t => "<option>" + h(t) + "</option>").join(""); el.value = v; if (el.value !== v) el.value = ""; }
+  $("dl-stype").innerHTML = [...new Set(["Residential estate","Apartment complex","Business park","Shopping centre","Suburb rollout","Maintenance", ...stypes])].map(t => '<option value="' + h(t) + '">').join("");
+  const qopts = '<option value="">All projects</option>' + S.quotes.filter(q => !q.archived).map(q => '<option value="' + h(q.id) + '">' + h((q.site||q.id) + " · " + q.id) + "</option>").join("");
+  for (const id of ["fq","ho-fq"]){ const el = $(id), v = el.value; el.innerHTML = qopts; el.value = v; if (el.value !== v) el.value = ""; }
+  const allTechs = new Set([...S.handovers.map(x => x.tech), ...S.assets.map(a => a.holder)].filter(Boolean)); $("dl-tech").innerHTML = [...allTechs].map(t => '<option value="' + h(t) + '">').join("");
+  const allSites = new Set([...S.quotes.map(q => q.site), ...S.moves.map(m => m.site)].filter(Boolean)); $("dl-site").innerHTML = [...allSites].map(t => '<option value="' + h(t) + '">').join("");
+
+  renderStock(rows, loaded); renderOnHand(rows, loaded); renderHandover(C); renderTechs(C, loaded); renderActivity(compute(S.rawItems, S.moves)); renderQuotes(C); renderPOs(loaded);
+  if (S.slipId && $("dlg-slip").open) fillSigned();
+  if (S.poId && $("dlg-po").open) fillPODoc();
+  renderAssets(loaded); if (S.assetId && $("dlg-asset").open) fillAssetExtras();
+  if (S.bookId && $("dlg-book").open) fillBook(C);
+  if (keep){ const el = $(keep.id); if (el && el !== document.activeElement){ el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch(_){} } }
+}
+
+function match(it, q, fq){ if (fq && it.quoteId !== fq) return false; if (!q) return true; return (it.code + " " + it.desc).toLowerCase().includes(q.toLowerCase()); }
+
+function renderStock(rows, loaded){
+  const box = $("stock-box");
+  if (!loaded){ box.innerHTML = '<div class="empty">' + (S.ready.nodb ? "The stock server is not responding. Check that it is running, then reload." : "Loading stock…") + "</div>"; return; }
+  if (!S.items.length){ box.innerHTML = '<div class="empty">No stock yet. Go to <b>Invoices</b> and import a supplier invoice to load its lines here.</div>'; return; }
+  const q = $("q").value.trim(), fq = $("fq").value, fs = $("fs").value, fc = $("fc").value, ft = $("ft").value;
+  const list = rows.filter(b => match(b.item, q, fq) && (!fc || catOf(b.item) === fc) && (!ft || (quoteOf(b.item.quoteId)?.siteType || "") === ft) && (!fs || (fs==="over" && isOver(b)) || (fs==="store" && b.store>0) || (fs==="tech" && b.withTech>0) || (fs==="used" && b.used>0) || (fs==="left" && b.left>0)))
+    .sort((a,b) => a.item.id < b.item.id ? -1 : 1);
+  if (!list.length){ box.innerHTML = '<div class="empty">No lines match that search.</div>'; return; }
+  const z = (n) => n ? qf(n) : '<span class="zero">0</span>';
+  box.innerHTML = '<table><thead><tr><th>Item</th><th>Project</th><th class="r">Invoiced</th><th class="r">In store</th><th class="r">With techs</th><th class="r">Used</th><th>Where it is</th><th></th></tr></thead><tbody>' +
+    list.map(b => { const it = b.item, t = it.qty || 1, pc = (n) => Math.max(0, n/t*100).toFixed(1);
+      return '<tr><td class="item"><b>' + h(it.desc) + "</b>" + (isOver(b) ? ' <span class="pill over">' + (quoteOf(b.item.quoteId).kind === "store" ? "Store stock" : "Leftover") + "</span>" : "") + '<div class="code">' + h(it.code) + " · " + h(catOf(it)) + " · " + money(it.price) + " per " + h(it.unit) + '</div></td><td>' + chip(it.quoteId) + '</td>' +
+        '<td class="r num">' + qf(it.qty) + ' <span class="muted small">' + h(it.unit) + '</span></td><td class="r num"' + (b.store < 0 ? ' style="color:var(--crit)"' : "") + '>' + z(b.store) + '</td><td class="r num">' + z(b.withTech) + '</td><td class="r num">' + z(b.used) + '</td>' +
+        '<td><div class="split" title="Used ' + qf(b.used) + ", with technicians " + qf(b.withTech) + ", in store " + qf(b.store) + '"><span class="s-used" style="width:' + pc(b.used) + '%"></span><span class="s-tech" style="width:' + pc(b.withTech) + '%"></span><span class="s-store" style="width:' + pc(b.store) + '%"></span></div></td>' +
+        '<td class="r"><button class="sm" data-book="' + h(it.id) + '">Book usage</button></td></tr>'; }).join("") + "</tbody></table>";
+}
+
+function renderHandover(C){
+  const box = $("ho-box"), q = $("ho-q").value.trim(), fq = $("ho-fq").value, fc = $("ho-fc").value;
+  const list = Object.values(C).filter(b => (b.store > 0 || S.draft[b.item.id]) && match(b.item, q, fq) && (!fc || catOf(b.item) === fc)).sort((a,b) => a.item.id < b.item.id ? -1 : 1);
+  box.innerHTML = list.length ? '<table><thead><tr><th>Item</th><th>Project</th><th class="r">In store</th><th class="r">Hand over</th></tr></thead><tbody>' +
+    list.map(b => '<tr><td class="item"><b>' + h(b.item.desc) + "</b>" + (isOver(b) ? ' <span class="pill over">' + (quoteOf(b.item.quoteId).kind === "store" ? "Store stock" : "Leftover") + "</span>" : "") + '<div class="code">' + h(b.item.code) + " · " + h(catOf(b.item)) + '</div></td><td>' + chip(b.item.quoteId) + '</td><td class="r num">' + qf(b.store) + ' <span class="muted small">' + h(b.item.unit) + '</span></td>' +
+      '<td class="r"><input class="qty num" id="hq-' + h(b.item.id) + '" data-hq="' + h(b.item.id) + '" type="number" min="0" max="' + b.store + '" step="any" inputmode="decimal" placeholder="0" aria-label="Quantity to hand over" value="' + h(S.draft[b.item.id] || "") + '"></td></tr>').join("") + "</tbody></table>"
+    : '<div class="empty">' + (S.items.length ? "No items in store match." : "Import an invoice first.") + "</div>";
+  hoSum(C);
+  const l = $("ho-list"), hs = [...S.handovers].sort((a,b) => a.id < b.id ? 1 : -1);
+  l.innerHTML = hs.length ? '<table><thead><tr><th>No.</th><th>Date</th><th>Issued to</th><th>Issued by</th><th class="r">Lines</th><th class="r">Value</th><th>Signed slip</th><th></th></tr></thead><tbody>' +
+    hs.map(x => '<tr><td class="num"><b>' + h(x.id) + "</b>" + (x.example ? ' <span class="pill ex">Example</span>' : "") + '</td><td class="num">' + h(x.date) + "</td><td>" + h(x.tech) + "</td><td>" + h(x.by) + '</td><td class="r num">' + x.lines.length + '</td><td class="r num">' + money(x.lines.reduce((a,l) => a + l.qty*l.price, 0)) + "</td><td>" + (x.signed ? '<a class="pill ok" href="/api/files/' + h(x.signed.file) + '" target="_blank" rel="noopener">Signed · view</a>' : '<span class="pill wait">Awaiting signature</span>') + '</td><td class="r"><button class="sm" data-slip="' + h(x.id) + '">Open slip</button></td></tr>').join("") + "</tbody></table>"
+    : '<div class="empty">No handovers yet. Slips you create appear here and can be downloaded again at any time.</div>';
+}
+function hoSum(C){ C = C || compute(S.items, S.moves); let n = 0, v = 0; for (const id in S.draft){ const qn = toNum(S.draft[id]); if (qn > 0 && C[id]){ n++; v += qn*C[id].item.price; } }
+  $("ho-sum").textContent = n ? n + " line" + (n===1?"":"s") + " selected, value " + money(v) : "No items selected"; }
+
+function renderOnHand(rows, loaded){
+  const box = $("oh-box"); if (!loaded){ box.innerHTML = '<div class="empty">Loading…</div>'; return; }
+  const q = $("oh-q").value.trim().toLowerCase(), fc = $("oh-fc").value, fs = $("oh-fs").value, by = {};
+  for (const b of rows){ const it = b.item, k = it.code || it.desc; const o = by[k] = by[k] || { code:it.code, desc:it.desc, unit:it.unit, cat:catOf(it), store:0, tech:0, value:0, who:{}, first:it.id };
+    o.store += Math.max(0, b.store); o.tech += Math.max(0, b.withTech); o.value += (Math.max(0, b.store) + Math.max(0, b.withTech)) * it.price;
+    for (const t in b.tech) if (b.tech[t] > 0) o.who[t] = (o.who[t]||0) + b.tech[t]; }
+  const list = Object.values(by).filter(o => (o.store + o.tech) > 0 && (!q || (o.code + " " + o.desc).toLowerCase().includes(q)) && (!fc || o.cat === fc) && (!fs || (fs === "store" && o.store > 0) || (fs === "tech" && o.tech > 0)))
+    .sort((a,b) => a.cat.localeCompare(b.cat) || a.desc.localeCompare(b.desc));
+  if (!list.length){ box.innerHTML = '<div class="empty">' + (S.items.length ? "Nothing on hand matches." : "Import an invoice first.") + "</div>"; return; }
+  let tv = 0; const z = (n) => n ? qf(n) : '<span class="zero">0</span>';
+  box.innerHTML = '<table><thead><tr><th>Item</th><th class="r">In store</th><th class="r">With technicians</th><th class="r">Total on hand</th><th class="r">Value on hand</th><th>Held by</th></tr></thead><tbody>' +
+    list.map(o => { tv += o.value; const who = Object.entries(o.who);
+      return '<tr><td class="item"><b>' + h(o.desc) + '</b><div class="code">' + h(o.code) + " · " + h(o.cat) + '</div></td><td class="r num">' + z(o.store) + '</td><td class="r num">' + z(o.tech) + '</td><td class="r num"><b>' + qf(o.store + o.tech) + '</b> <span class="muted small">' + h(o.unit) + '</span></td><td class="r num">' + money(o.value) + '</td><td class="small">' + (who.length ? who.map(([t,n]) => h(t) + " " + qf(n)).join("<br>") : '<span class="zero">–</span>') + "</td></tr>"; }).join("") +
+    '<tr><td colspan="4" class="r"><b>Total value on hand (excl. VAT)</b></td><td class="r num"><b>' + money(tv) + "</b></td><td></td></tr></tbody></table>";
+}
+
+function renderTechs(C, loaded){
+  const box = $("tech-box"); if (!loaded){ box.innerHTML = '<div class="panel empty">Loading…</div>'; return; }
+  const open = new Set([...box.querySelectorAll("details[open]")].map(d => d.dataset.tech)), T = {};
+  const get = (t) => T[t] = T[t] || { items:[], value:0, slips:[], oldest:"", assets:[] };
+  for (const a of S.assets) if (a.holder && !["Lost or stolen","Written off"].includes(a.cond)) get(a.holder).assets.push(a);
+  for (const x of S.handovers) get(x.tech).slips.push(x);
+  for (const b of Object.values(C)) for (const t in b.tech) if (b.tech[t] > 0){ const o = get(t); let since = "";
+    for (const m of S.moves) if (m.type === "issue" && m.itemId === b.item.id && m.tech === t && (!since || m.date < since)) since = m.date;
+    o.items.push({ b, qty:b.tech[t], since }); o.value += b.tech[t]*b.item.price; if (since && (!o.oldest || since < o.oldest)) o.oldest = since; }
+  const names = Object.keys(T).sort((a,b) => T[b].value - T[a].value || a.localeCompare(b));
+  if (!names.length){ box.innerHTML = '<div class="panel empty">No stock has been handed to anyone yet. Use the Hand over tab to issue stock.</div>'; return; }
+  box.innerHTML = names.map(t => { const o = T[t], uns = o.slips.filter(x => !x.signed), days = o.oldest ? daysSince(o.oldest) : 0;
+    const pills = (o.items.length ? '<span class="pill ' + (days >= LATE_DAYS ? "late" : "wait") + '">' + o.items.length + " item" + (o.items.length===1?"":"s") + " not yet booked or returned · " + days + " day" + (days===1?"":"s") + "</span>" : '<span class="pill ok">All stock accounted for</span>') +
+      (uns.length ? '<span class="pill late">' + uns.length + " slip" + (uns.length===1?"":"s") + " not signed</span>" : o.slips.length ? '<span class="pill ok">All slips signed</span>' : "");
+    return '<details class="tech" data-tech="' + h(t) + '"' + (open.has(t) ? " open" : "") + '><summary><div><h3>' + h(t) + '</h3><div class="small muted">Responsible for ' + money(o.value) + " of stock" + (o.assets.length ? " and " + o.assets.length + " asset" + (o.assets.length===1?"":"s") : "") + "</div></div><div class=\"pills\">" + pills + "</div></summary>" +
+      (o.items.length ? '<div class="scroll"><table><thead><tr><th>Item held</th><th>Project</th><th class="r">Qty held</th><th class="r">Value</th><th>Held since</th><th></th></tr></thead><tbody>' + o.items.map(r => '<tr><td class="item"><b>' + h(r.b.item.desc) + '</b><div class="code">' + h(r.b.item.code) + '</div></td><td>' + chip(r.b.item.quoteId) + '</td><td class="r num">' + qf(r.qty) + ' <span class="muted small">' + h(r.b.item.unit) + '</span></td><td class="r num">' + money(r.qty*r.b.item.price) + '</td><td class="num">' + h(r.since) + ' <span class="muted small">(' + daysSince(r.since) + ' d)</span></td><td class="r"><button class="sm" data-book="' + h(r.b.item.id) + '" data-from="' + h(t) + '">Book or return</button></td></tr>').join("") + "</tbody></table></div>" : '<div class="empty">Holding nothing. Everything issued has been used or returned.</div>') +
+      (o.assets.length ? '<div class="pad" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line)"><span class="small muted">Assets:</span>' + o.assets.map(a => '<button class="sm" data-asset="' + h(a.id) + '">' + h(a.name) + (a.serial ? " · " + h(a.serial) : "") + "</button>").join("") + "</div>" : "") +
+      (o.slips.length ? '<div class="pad" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line)"><span class="small muted">Handover slips:</span>' + o.slips.map(x => '<button class="sm" data-slip="' + h(x.id) + '">' + h(x.id) + " · " + (x.signed ? "signed" : "not signed") + "</button>").join("") + "</div>" : "") + "</details>"; }).join("");
+}
+
+function fillSigned(){ const x = S.handovers.find(v => v.id === S.slipId); if (!x) return; const sg = x.signed;
+  $("sl-signed").innerHTML = sg ? '<div class="kv"><span class="pill ok">Signed</span><span>Uploaded by <b>' + h(sg.by || "?") + "</b> on <b>" + h((sg.at||"").slice(0,10)) + '</b></span><a href="/api/files/' + h(sg.file) + '" target="_blank" rel="noopener">View signed slip</a><button class="sm danger" id="sl-unsign">Remove file</button></div>'
+    : '<span class="pill wait">Awaiting signature</span> <span class="small muted">Print the slip, have it signed, then upload a photo or scan here.</span>';
+  $("sl-up-l").textContent = sg ? "Replace with a different file" : "Upload the signed slip (photo or PDF)"; }
+async function uploadSigned(file){ const by = myName(); if (!by){ $("sl-file").value = ""; return; } const err = $("sl-err");
+  if (file.size > 10*1024*1024){ err.textContent = "That file is over 10 MB. Take a smaller photo or scan."; $("sl-file").value = ""; return; }
+  err.textContent = "Uploading…";
+  try { const r = await fetch("/api/signed/" + encodeURIComponent(S.slipId), { method:"POST", headers:{ "Content-Type":file.type || "application/octet-stream", "X-Filename":encodeURIComponent(file.name), "X-By":encodeURIComponent(by) }, body:file });
+    if (r.status === 401){ location.href = "/login"; return; }
+    if (!r.ok){ err.textContent = r.status === 415 ? "Use a photo (JPG, PNG) or a PDF." : r.status === 413 ? "That file is too large." : "The upload did not work. Try again."; return; }
+    err.textContent = ""; await refresh(); toast("Signed slip saved for " + S.slipId); }
+  catch(_){ err.textContent = "The upload did not work. Check your connection."; } finally { $("sl-file").value = ""; } }
+
+/* ---------- backup ---------- */
+let buLoaded = false;
+async function loadBackups(){ try { const r = await api("GET", "/api/backups"); buLoaded = true; const d = r.daily || [];
+    $("bu-info").textContent = d.length ? "The server also keeps a copy automatically each day. Latest: " + d[d.length-1] + " (" + d.length + " of the last " + r.keep + " days kept)." : "The server keeps a copy automatically each day."; }
+  catch(_){ $("bu-info").textContent = ""; } }
+function markBackup(){ try { localStorage.setItem("stock-last-backup", today()); } catch(_){} }
+async function restoreBackup(){ const f = $("bu-file").files[0], err = $("bu-err"); if (!f) return; err.textContent = "Restoring…";
+  try { const r = await fetch("/api/restore", { method:"POST", headers:{ "Content-Type":"application/zip" }, body:f });
+    if (r.status === 401){ location.href = "/login"; return; }
+    if (!r.ok){ err.textContent = r.status === 400 ? "That is not a Blitz Stock Control backup file." : r.status === 413 ? "That file is too large to restore here." : "The restore did not work. Nothing was changed."; return; }
+    const j = await r.json(); err.textContent = ""; $("bu-file").value = ""; $("bu-restore").hidden = true; await refresh(); toast("Restored " + j.records + " records and " + j.files + " files"); }
+  catch(_){ err.textContent = "The restore did not work. Check your connection."; } }
+
+/* ---------- purchase orders ---------- */
+const poSent = (p) => p.sentTo || "";
+const poName = (n) => /^PO/i.test(n || "") ? n : "PO " + n;
+const poPill = (p) => p.paid ? '<span class="pill ok">Paid</span>' : '<span class="pill ' + (poSent(p) ? "wait" : "late") + '">Not paid</span>';
+function renderPOs(loaded){
+  const box = $("po-box"); if (!loaded || !S.ready.pos){ box.innerHTML = '<div class="empty">Loading…</div>'; return; }
+  const all = S.pos, tot = (l) => l.reduce((x,p) => x + (p.amount || 0), 0);
+  const ns = all.filter(p => !poSent(p)), up = all.filter(p => !p.paid), pd = all.filter(p => p.paid);
+  $("po-f1").textContent = String(all.length); $("po-f1s").textContent = money(tot(all)) + " excl. VAT";
+  $("po-f2").textContent = String(ns.length); $("po-f2s").textContent = money(tot(ns));
+  $("po-f3").textContent = money(tot(up)); $("po-f3s").textContent = up.length + " PO" + (up.length===1?"":"s");
+  $("po-f4").textContent = money(tot(pd)); $("po-f4s").textContent = pd.length + " PO" + (pd.length===1?"":"s");
+  $("dl-posup").innerHTML = [...new Set(all.map(p => p.supplier).filter(Boolean))].map(t => '<option value="' + h(t) + '">').join("");
+  if (!all.length){ box.innerHTML = '<div class="empty">No purchase orders yet. Click <b>Add PO</b> to record the first one.</div>'; return; }
+  const q = $("po-q").value.trim().toLowerCase(), fs = $("po-fs").value, fp = $("po-fp").value;
+  const list = all.filter(p => (!q || [p.no, p.supplier, p.desc, p.site].join(" ").toLowerCase().includes(q)) && (!fs || (fs === "none" ? !poSent(p) : poSent(p) === fs)) && (!fp || (fp === "paid" ? p.paid : !p.paid)))
+    .sort((a,b) => (b.date || "").localeCompare(a.date || "") || (b.no || "").localeCompare(a.no || ""));
+  if (!list.length){ box.innerHTML = '<div class="empty">No purchase orders match.</div>'; return; }
+  box.innerHTML = '<table><thead><tr><th>PO</th><th>Supplier</th><th>What for</th><th class="r">Amount</th><th>Sent to</th><th>Payment</th><th>Document</th><th></th></tr></thead><tbody>' + list.map(p =>
+    '<tr><td><b class="num">' + h(p.no) + '</b><div class="code">' + h(p.date || "") + (p.invoice ? " · " + h(p.invoice) : "") + "</div></td><td>" + h(p.supplier || "") + '</td><td class="item">' + h(p.desc || "") + (p.site ? '<div class="code">' + h(p.site) + "</div>" : "") + '</td><td class="r num">' + money(p.amount || 0) + "</td>" +
+    '<td><select id="ps-' + h(p.id) + '" data-pok="sentTo" data-poid="' + h(p.id) + '" aria-label="Sent to" style="min-width:130px"><option value="">Not sent yet</option><option' + (p.sentTo === "CVA" ? " selected" : "") + ">CVA</option><option" + (p.sentTo === "Supplier" ? " selected" : "") + '>Supplier</option></select>' + (p.sentDate ? '<div class="code">' + h(p.sentDate) + "</div>" : "") + "</td>" +
+    '<td><select id="pp-' + h(p.id) + '" data-pok="paid" data-poid="' + h(p.id) + '" aria-label="Payment" style="min-width:110px"><option value="">Not paid</option><option value="paid"' + (p.paid ? " selected" : "") + ">Paid</option></select>" + (p.paidDate ? '<div class="code">' + h(p.paidDate) + "</div>" : "") + "</td>" +
+    "<td>" + (p.doc ? '<a href="/api/files/' + h(p.doc.file) + '" target="_blank" rel="noopener">View</a>' : '<span class="zero">–</span>') + '</td><td class="r"><button class="sm" data-po="' + h(p.id) + '">Open</button></td></tr>').join("") +
+    '<tr><td colspan="3" class="r"><b>Total shown</b></td><td class="r num"><b>' + money(tot(list)) + "</b></td><td colspan=\"4\"></td></tr></tbody></table>";
+}
+const PF = { no:"pd-no", date:"pd-date", supplier:"pd-sup", site:"pd-site", invoice:"pd-inv", sentTo:"pd-sent", sentDate:"pd-sentd", paidDate:"pd-paidd", desc:"pd-desc", notes:"pd-notes" };
+function openPO(id){ const p = id ? S.pos.find(x => x.id === id) : null; if (id && !p) return; S.poId = id || null;
+  $("pd-inv").innerHTML = '<option value="">None</option>' + S.quotes.map(q => '<option value="' + h(q.id) + '">' + h(q.id + (q.site ? " · " + q.site : "")) + "</option>").join("");
+  for (const k in PF) $(PF[k]).value = p ? (p[k] || "") : (k === "date" ? today() : "");
+  $("pd-amt").value = p && p.amount ? p.amount : ""; $("pd-paid").value = p && p.paid ? "paid" : "";
+  $("pd-err").textContent = ""; $("pd-file").value = ""; $("pd-del").textContent = "Delete this PO"; $("pd-del").dataset.armed = "";
+  $("pd-title").textContent = p ? poName(p.no) : "New purchase order"; fillPODoc(); $("dlg-po").showModal(); if (!p) $("pd-no").focus(); }
+function fillPODoc(){ const p = S.poId ? S.pos.find(x => x.id === S.poId) : null; $("pd-more").hidden = !p; $("pd-del").hidden = !p;
+  $("pd-sub").textContent = p ? (p.by ? "Added by " + p.by : "") : "Save the PO first, then attach the document"; if (!p) return;
+  $("pd-doc").innerHTML = p.doc ? '<div class="kv"><a href="/api/files/' + h(p.doc.file) + '" target="_blank" rel="noopener">View PO document</a><span class="small muted">' + h(p.doc.name || "") + '</span><button class="sm danger" id="pd-undoc">Remove file</button></div>' : '<span class="small muted">No document attached yet.</span>';
+  $("pd-up-l").textContent = p.doc ? "Replace with a different file" : "Attach the PO (PDF or photo)"; }
+async function savePO(){ const by = myName(); if (!by) return; const err = $("pd-err"), d = {};
+  for (const k in PF) d[k] = $(PF[k]).value.trim(); d.amount = toNum($("pd-amt").value); d.paid = $("pd-paid").value === "paid";
+  if (!d.no){ err.textContent = "Enter the PO number."; $("pd-no").focus(); return; }
+  const dup = S.pos.find(x => x.id !== S.poId && norm(x.no) === norm(d.no)); if (dup){ err.textContent = poName(d.no) + " already exists."; return; }
+  if (d.sentTo && !d.sentDate) d.sentDate = today(); if (!d.sentTo) d.sentDate = "";
+  if (d.paid && !d.paidDate) d.paidDate = today(); if (!d.paid) d.paidDate = "";
+  err.textContent = ""; $("pd-save").disabled = true;
+  try { if (S.poId){ await db.doc("pos/" + S.poId).update(d); toast(poName(d.no) + " saved"); $("pd-title").textContent = poName(d.no); }
+    else { const id = "PO" + Date.now().toString(36) + Math.random().toString(36).slice(2,5); await db.doc("pos/" + id).set({ ...d, by, at:new Date().toISOString() });
+      S.poId = id; $("pd-title").textContent = poName(d.no); fillPODoc(); toast(poName(d.no) + " saved. You can attach the document now."); } }
+  catch(e){ fail(e); } finally { $("pd-save").disabled = false; } }
+async function quickPO(id, key, val){ const p = S.pos.find(x => x.id === id); if (!p) return; const d = {};
+  if (key === "sentTo"){ d.sentTo = val; d.sentDate = val ? (p.sentDate || today()) : ""; }
+  else { d.paid = val === "paid"; d.paidDate = d.paid ? (p.paidDate || today()) : ""; }
+  try { await db.doc("pos/" + id).update(d); toast(poName(p.no) + ": " + (key === "sentTo" ? (val ? "sent to " + val : "not sent yet") : (d.paid ? "paid" : "not paid"))); } catch(e){ fail(e); } }
+async function uploadPODoc(file){ const by = myName(), err = $("pd-err"); if (!by || !S.poId){ $("pd-file").value = ""; return; }
+  if (file.size > 10*1024*1024){ err.textContent = "That file is over 10 MB."; $("pd-file").value = ""; return; }
+  err.textContent = "Uploading…";
+  try { const r = await fetch("/api/podoc/" + encodeURIComponent(S.poId), { method:"POST", headers:{ "Content-Type":file.type || "application/octet-stream", "X-Filename":encodeURIComponent(file.name), "X-By":encodeURIComponent(by) }, body:file });
+    if (r.status === 401){ location.href = "/login"; return; }
+    if (!r.ok){ err.textContent = r.status === 415 ? "Use a PDF or a photo (JPG, PNG)." : "The upload did not work. Try again."; return; }
+    err.textContent = ""; await refresh(); toast("PO document attached"); }
+  catch(_){ err.textContent = "The upload did not work. Check your connection."; } finally { $("pd-file").value = ""; } }
+async function archiveQuote(id){ const by = myName(); if (!by) return; const C = compute(S.items, S.moves);
+  const held = S.items.filter(i => i.quoteId === id && C[i.id] && C[i.id].withTech > 0);
+  if (held.length){ toast(held.length + " item" + (held.length===1?" is":"s are") + " from " + id + " still with technicians. Book or return them first, then archive."); return; }
+  try { await db.doc("quotes/" + id).update({ archived:true, archivedBy:by, archivedAt:new Date().toISOString() }); toast(id + " archived. Restore it any time from the Archived list."); } catch(e){ fail(e); } }
+
+/* ---------- management report ---------- */
+function reportData(){ const C = compute(S.items, S.moves), rows = Object.values(C), by = {}, T = {};
+  const person = (t) => T[t] = T[t] || { name:t, items:[], assets:[], value:0, slipList:[] };
+  let store = 0, tech = 0, used = 0;
+  for (const b of rows){ const it = b.item, k = it.code || it.desc, st = Math.max(0, b.store), wt = Math.max(0, b.withTech);
+    store += st*it.price; tech += wt*it.price; used += b.used*it.price;
+    const o = by[k] = by[k] || { code:it.code, desc:it.desc, unit:it.unit, cat:catOf(it), store:0, tech:0, value:0, w:{} };
+    o.store += st; o.tech += wt; o.value += (st + wt)*it.price;
+    for (const t in b.tech) if (b.tech[t] > 0){ o.w[t] = (o.w[t]||0) + b.tech[t]; let since = "";
+      for (const m of S.moves) if (m.type === "issue" && m.itemId === it.id && m.tech === t && (!since || m.date < since)) since = m.date;
+      const P = person(t); P.value += b.tech[t]*it.price;
+      P.items.push({ code:it.code, desc:it.desc, project:(quoteOf(it.quoteId)?.site || it.quoteId), qty:b.tech[t], unit:it.unit, value:b.tech[t]*it.price, since, days:daysSince(since) }); } }
+  for (const x of S.handovers) person(x.tech).slipList.push(x.id + (x.signed ? " signed" : " NOT SIGNED"));
+  const assets = [...S.assets].sort((a,b) => a.id < b.id ? -1 : 1).map(a => ({ id:a.id, name:a.name || "", type:a.type || "", make:a.make || "", serial:a.serial || "", tag:a.tag || "", holder:a.holder || "", loc:a.loc || "", cond:a.cond || "", value:a.value || 0, photos:(a.photos||[]).length }));
+  for (const a of assets) if (a.holder) person(a.holder).assets.push(a);
+  const people = Object.values(T).map(P => ({ ...P, slips:P.slipList.join(", ") })).sort((a,b) => a.name.localeCompare(b.name));
+  const onhand = Object.values(by).filter(o => o.store + o.tech > 0).sort((a,b) => a.cat.localeCompare(b.cat) || a.desc.localeCompare(b.desc)).map(o => ({ ...o, who:Object.entries(o.w).map(([t,n]) => t + " " + qf(n)).join(", ") }));
+  return { date:today(), by:$("me").value.trim(), onhand, people, assets,
+    sum:{ store, tech, used, people:people.filter(P => P.items.length).length, assets:assets.length, assetValue:assets.reduce((x,a) => x + a.value, 0), noSerial:assets.filter(a => !a.serial).length, noPhoto:assets.filter(a => !a.photos).length, assigned:assets.filter(a => a.holder).length, holders:new Set(assets.map(a => a.holder).filter(Boolean)).size, slips:S.handovers.length, unsigned:S.handovers.filter(x => !x.signed).length } }; }
+function downloadReport(only){ if (!["quotes","items","moves","handovers"].every(k => S.ready[k])){ toast("Still loading. Try again in a moment."); return; }
+  if (!window.jspdf){ toast("The report tool did not load. Reload the page and try again."); return; }
+  try { const R = reportData(); R.only = only || "";
+    if (only === "assets" && !R.assets.length){ toast("There are no assets on the register yet."); return; }
+    buildReport(window.jspdf.jsPDF, (d,o) => d.autoTable(o), R).save((only === "assets" ? "Blitz asset report " : "Blitz stock and asset report ") + R.date + ".pdf"); toast("Report downloaded"); }
+  catch(e){ console.error(e); toast("The report could not be created."); } }
+
+/* ---------- asset register ---------- */
+function setOpts(id, first, vals){ const el = $(id), v = el.value; el.innerHTML = '<option value="">' + first + "</option>" + vals.map(x => "<option>" + h(x) + "</option>").join(""); el.value = v; if (el.value !== v) el.value = ""; }
+function renderAssets(loaded){
+  const box = $("as-box"); if (!loaded){ box.innerHTML = '<div class="empty">Loading…</div>'; return; }
+  const types = [...new Set(S.assets.map(a => a.type).filter(Boolean))].sort(), holders = [...new Set(S.assets.map(a => a.holder || "Store"))].sort();
+  setOpts("as-ft", "All types", types); setOpts("as-fh", "Anyone", holders); if ($("as-fc").options.length < 2) setOpts("as-fc", "Any condition", CONDS);
+  if (!$("ad-cond").options.length) $("ad-cond").innerHTML = CONDS.map(c => "<option>" + c + "</option>").join("");
+  $("dl-atype").innerHTML = [...new Set([...ATYPES, ...types])].map(t => '<option value="' + h(t) + '">').join("");
+  $("dl-aloc").innerHTML = [...new Set(["Gauteng","Eastern Cape","Bloemfontein", ...S.assets.map(a => a.loc).filter(Boolean)])].map(t => '<option value="' + h(t) + '">').join("");
+  const q = $("as-q").value.trim().toLowerCase(), ft = $("as-ft").value, fh = $("as-fh").value, fc = $("as-fc").value;
+  const list = S.assets.filter(a => (!q || [a.name, a.serial, a.tag, a.make, a.id].join(" ").toLowerCase().includes(q)) && (!ft || a.type === ft) && (!fh || (a.holder || "Store") === fh) && (!fc || a.cond === fc)).sort((a,b) => a.id < b.id ? -1 : 1);
+  const tv = list.reduce((x,a) => x + (a.value || 0), 0), noPhoto = S.assets.filter(a => !(a.photos||[]).length).length, noSerial = S.assets.filter(a => !a.serial).length;
+  $("as-sum").textContent = S.assets.length ? list.length + " of " + S.assets.length + " assets shown, recorded value " + money(tv) + (noPhoto ? " · " + noPhoto + " without a photo" : "") + (noSerial ? " · " + noSerial + " without a serial number" : "") : "";
+  if (!S.assets.length){ box.innerHTML = '<div class="empty">No assets yet. Click <b>Add asset</b> to record the first one, then add its photos.</div>'; return; }
+  if (!list.length){ box.innerHTML = '<div class="empty">No assets match.</div>'; return; }
+  box.innerHTML = '<table><thead><tr><th></th><th>Asset</th><th>Serial number</th><th>Tag</th><th>Assigned to</th><th>Location</th><th>Condition</th><th class="r">Value</th><th></th></tr></thead><tbody>' + list.map(a => { const ph = (a.photos||[])[0];
+    return "<tr><td>" + (ph ? '<img class="thumb" loading="lazy" alt="" src="/api/files/' + h(ph.file) + '">' : '<span class="thumb none" title="No photo yet"></span>') + '</td><td class="item"><b>' + h(a.name) + '</b><div class="code">' + h(a.id) + (a.type ? " · " + h(a.type) : "") + (a.make ? " · " + h(a.make) : "") + '</div></td><td class="num">' + (a.serial ? h(a.serial) : '<span class="pill late">Missing</span>') + '</td><td class="num">' + h(a.tag || "") + "</td><td>" + h(a.holder || "Store") + "</td><td>" + h(a.loc || "") + '</td><td><span class="pill ' + condClass(a.cond) + '">' + h(a.cond || "Not set") + '</span></td><td class="r num">' + (a.value ? money(a.value) : '<span class="zero">–</span>') + '</td><td class="r"><button class="sm" data-asset="' + h(a.id) + '">Open</button></td></tr>'; }).join("") + "</tbody></table>";
+}
+const AF = { name:"ad-name", type:"ad-type", make:"ad-make", serial:"ad-serial", tag:"ad-tag", holder:"ad-holder", loc:"ad-loc", cond:"ad-cond", bought:"ad-date", notes:"ad-notes" };
+function openAsset(id){ const a = id ? S.assets.find(x => x.id === id) : null; if (id && !a) return; S.assetId = id || null;
+  for (const k in AF) $(AF[k]).value = a ? (a[k] || "") : (k === "cond" ? "Good" : "");
+  $("ad-value").value = a && a.value ? a.value : ""; $("ad-err").textContent = ""; $("ad-file").value = ""; $("ad-del").textContent = "Remove this asset"; $("ad-del").dataset.armed = "";
+  $("ad-title").textContent = a ? a.name : "New asset"; fillAssetExtras(); $("dlg-asset").showModal(); }
+function fillAssetExtras(){ const a = S.assetId ? S.assets.find(x => x.id === S.assetId) : null;
+  $("ad-id").textContent = a ? a.id : "Save the details first, then add photos"; $("ad-more").hidden = !a; $("ad-del").hidden = !a; if (!a) return;
+  const ph = a.photos || [];
+  $("ad-photos").innerHTML = ph.length ? ph.map(f => '<figure><a href="/api/files/' + h(f.file) + '" target="_blank" rel="noopener"><img loading="lazy" alt="Photo of ' + h(a.name) + '" src="/api/files/' + h(f.file) + '"></a><button class="sm danger" data-delphoto="' + h(f.file) + '">Remove</button></figure>').join("") : '<span class="small muted">No photos yet.</span>';
+  const hs = a.history || [];
+  $("ad-hist").innerHTML = hs.length ? '<h3 style="margin-bottom:6px">Who has had it</h3><div class="small">' + [...hs].reverse().map(x => h(x.holder || "Store") + ' <span class="muted">from ' + h(x.from) + " (entered by " + h(x.by) + ")</span>").join("<br>") + "</div>" : ""; }
+async function saveAsset(){ const by = myName(); if (!by) return; const err = $("ad-err"), d = {};
+  for (const k in AF) d[k] = $(AF[k]).value.trim(); d.value = toNum($("ad-value").value);
+  if (!d.name){ err.textContent = "Enter the asset name."; $("ad-name").focus(); return; }
+  const dup = d.serial && S.assets.find(x => x.id !== S.assetId && norm(x.serial) === norm(d.serial));
+  if (dup){ err.textContent = "Serial number " + d.serial + " is already on " + dup.id + " (" + dup.name + ")."; return; }
+  err.textContent = ""; $("ad-save").disabled = true;
+  try { if (S.assetId){ const a = S.assets.find(x => x.id === S.assetId);
+      if (norm(a.holder) !== norm(d.holder)) d.history = [...(a.history||[]), { holder:d.holder, from:today(), by }];
+      await db.doc("assets/" + S.assetId).update(d); toast("Asset saved"); }
+    else { const n = S.assets.reduce((m,x) => Math.max(m, parseInt(x.id.replace(/\D/g,""),10) || 0), 0) + 1, id = "AST-" + String(n).padStart(4,"0");
+      await db.doc("assets/" + id).set({ ...d, photos:[], history:[{ holder:d.holder, from:today(), by }], by, at:new Date().toISOString() });
+      S.assetId = id; $("ad-title").textContent = d.name; fillAssetExtras(); toast(id + " saved. Now add its photos."); } }
+  catch(e){ fail(e); } finally { $("ad-save").disabled = false; } }
+// Shrink phone photos in the browser so they upload fast and do not fill the server disk.
+async function shrink(file){ const bmp = await createImageBitmap(file), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas");
+  c.width = Math.round(bmp.width*k); c.height = Math.round(bmp.height*k); c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("encode")), "image/jpeg", 0.85)); }
+async function uploadPhotos(files){ const by = myName(), err = $("ad-err"); if (!by || !S.assetId){ $("ad-file").value = ""; return; } let ok = 0, bad = 0;
+  for (const f of files){ err.textContent = "Uploading " + (ok + bad + 1) + " of " + files.length + "…";
+    try { const blob = await shrink(f); const r = await fetch("/api/photo/" + encodeURIComponent(S.assetId), { method:"POST", headers:{ "Content-Type":"image/jpeg", "X-By":encodeURIComponent(by) }, body:blob });
+      if (r.status === 401){ location.href = "/login"; return; } if (r.ok) ok++; else { bad++; if (r.status === 409){ err.textContent = "This asset already has the maximum of 12 photos."; break; } } }
+    catch(_){ bad++; } }
+  $("ad-file").value = ""; if (!/maximum/.test(err.textContent)) err.textContent = bad ? bad + " photo" + (bad===1?"":"s") + " could not be read. Use JPG or PNG photos." : "";
+  try { await refresh(); } catch(_){} if (ok) toast(ok + " photo" + (ok===1?"":"s") + " added"); }
+
+function renderActivity(C){
+  const per = {};
+  for (const m of S.moves) if (m.type === "use"){ const it = C[m.itemId]; if (!it) continue; const k = m.site || "Unspecified"; per[k] = per[k] || { n:0, v:0, r:0, items:new Set() }; per[k].v += m.qty*it.item.price; if (norm(quoteOf(it.item.quoteId)?.site) !== norm(k)) per[k].r += m.qty*it.item.price; per[k].items.add(m.itemId); }
+  const ks = Object.keys(per).sort();
+  $("site-box").innerHTML = ks.length ? '<table><thead><tr><th>Site</th><th class="r">Different items</th><th class="r">Value used</th><th class="r">Of which from other projects</th></tr></thead><tbody>' + ks.map(k => "<tr><td><b>" + h(k) + '</b></td><td class="r num">' + per[k].items.size + '</td><td class="r num">' + money(per[k].v) + '</td><td class="r num">' + (per[k].r ? money(per[k].r) : '<span class="zero">–</span>') + "</td></tr>").join("") + "</tbody></table>"
+    : '<div class="empty">Nothing booked to a site yet. Use <b>Book usage</b> on the Stock tab.</div>';
+  const ms = [...S.moves].sort((a,b) => (b.date + (b.at||"")).localeCompare(a.date + (a.at||"")));
+  const lab = { use:"Used on site", issue:"Handed over", return:"Returned" };
+  $("act-box").innerHTML = ms.length ? '<table><thead><tr><th>Date</th><th>What</th><th>Item</th><th class="r">Qty</th><th>Who / where</th><th>Entered by</th><th></th></tr></thead><tbody>' +
+    ms.map(m => { const it = C[m.itemId] && C[m.itemId].item; const w = m.type === "use" ? h(m.site||"Unspecified") + '<div class="code">from ' + h(m.tech || "store") + "</div>" : h(m.tech) + (m.handoverId ? '<div class="code">' + h(m.handoverId) + "</div>" : "");
+      return '<tr><td class="num">' + h(m.date) + '</td><td><span class="pill ' + m.type + '">' + lab[m.type] + '</span></td><td class="item">' + h(it ? it.desc : "Removed item") + (m.note ? '<div class="code">' + h(m.note) + "</div>" : "") + '</td><td class="r num">' + qf(m.qty) + " " + h(it ? it.unit : "") + "</td><td>" + w + "</td><td>" + h(m.by) + '</td><td class="r">' + (m.handoverId ? "" : '<button class="sm danger" data-delmove="' + h(m.id) + '">Remove</button>') + "</td></tr>"; }).join("") + "</tbody></table>"
+    : '<div class="empty">No movements yet.</div>';
+}
+
+function renderQuotes(C){
+  const active = S.quotes.filter(q => !q.archived), archived = S.quotes.filter(q => q.archived);
+  $("quote-archived").innerHTML = archived.length ? '<details class="tech"><summary><h3>Archived (' + archived.length + ')</h3><span class="small muted">Hidden from stock, totals and reports. Nothing was deleted.</span></summary><div class="scroll"><table><thead><tr><th>Invoice</th><th>Project / site</th><th>Supplier</th><th class="r">Lines</th><th>Archived</th><th></th></tr></thead><tbody>' +
+    archived.map(q => '<tr><td><b class="num">' + h(q.id) + '</b><div class="code">' + h(q.date) + "</div></td><td>" + h(q.site || "") + "</td><td>" + h(q.supplier || "") + '</td><td class="r num">' + S.rawItems.filter(i => i.quoteId === q.id).length + '</td><td class="small">' + h((q.archivedAt || "").slice(0,10)) + (q.archivedBy ? " by " + h(q.archivedBy) : "") + '</td><td class="r"><button class="sm" data-unarch="' + h(q.id) + '">Restore</button></td></tr>').join("") + "</tbody></table></div></details>" : "";
+  $("quote-list").innerHTML = active.length ? '<table><thead><tr><th>Invoice</th><th>Project / site</th><th>Site type</th><th>Status</th><th>Supplier</th><th class="r">Lines</th><th class="r">Value excl. VAT</th><th class="r">Leftover in store</th><th></th></tr></thead><tbody>' +
+    active.map(q => { const its = S.items.filter(i => i.quoteId === q.id); const used = S.moves.some(m => its.some(i => i.id === m.itemId));
+      return '<tr><td><b class="num">' + h(q.id) + "</b><div class=\"code\">" + h(q.date) + "</div></td><td>" + chip(q.id) + '</td><td><input id="qt-' + h(q.id) + '" data-qk="siteType" data-qid="' + h(q.id) + '" list="dl-stype" placeholder="Not set" value="' + h(q.siteType||"") + '" style="min-width:150px" aria-label="Site type"></td><td>' + (q.kind === "store" ? '<span class="pill over">Store stock</span><span hidden>' : "<span>") + '<select id="qs-' + h(q.id) + '" data-qk="status" data-qid="' + h(q.id) + '" aria-label="Status" style="min-width:120px"><option value="active">Active</option><option value="done"' + (q.status === "done" ? " selected" : "") + ">Completed</option></select></span></td><td>" + h(q.supplier) + '</td><td class="r num">' + its.length + '</td><td class="r num">' + money(its.reduce((a,i) => a + i.qty*i.price, 0)) + '</td><td class="r num">' + (q.status === "done" ? money(its.reduce((a,i) => a + Math.max(0, C[i.id] ? C[i.id].store : 0)*i.price, 0)) : '<span class="zero">–</span>') + '</td><td class="r">' + (used ? "" : '<button class="sm danger" data-delquote="' + h(q.id) + '">Delete</button> ') + '<button class="sm" data-arch="' + h(q.id) + '">Archive</button>' + "</td></tr>"; }).join("") + "</tbody></table>"
+    : '<div class="empty">No invoices imported yet.</div>';
+}
+
+/* ---------- book usage ---------- */
+function openBook(id, from){ S.bookId = id; S.mode = "use"; const it = S.items.find(i => i.id === id), q = quoteOf(it.quoteId);
+  $("bk-qty").value = ""; $("bk-note").value = ""; $("bk-site").value = (q && q.kind !== "store" && q.site) || ""; $("bk-date").value = today(); $("bk-err").textContent = "";
+  fillBook(compute(S.items, S.moves), true); if (from && [...$("bk-from").options].some(o => o.value === from)) $("bk-from").value = from; $("dlg-book").showModal(); }
+function fillBook(C, reset){ const b = C[S.bookId]; if (!b){ $("dlg-book").close(); return; } const it = b.item;
+  $("bk-title").textContent = it.desc; $("bk-code").textContent = it.code + " · " + (quoteOf(it.quoteId)?.id || "");
+  const held = Object.entries(b.tech).filter(([,n]) => n > 0);
+  $("bk-kv").innerHTML = "<span>Invoiced <b>" + qf(it.qty) + " " + h(it.unit) + "</b></span><span>In store <b>" + qf(b.store) + "</b></span>" + held.map(([t,n]) => "<span>" + h(t) + " <b>" + qf(n) + "</b></span>").join("") + "<span>Used <b>" + qf(b.used) + "</b></span>";
+  for (const btn of $("bk-mode").children) btn.setAttribute("aria-pressed", btn.dataset.mode === S.mode);
+  const sel = $("bk-from"), prev = reset ? null : sel.value;
+  const opts = (S.mode === "use" ? [["", "Store (" + qf(b.store) + " available)"]] : []).concat(held.map(([t,n]) => [t, t + " (" + qf(n) + " held)"]));
+  sel.innerHTML = opts.length ? opts.map(([v,l]) => '<option value="' + h(v) + '">' + h(l) + "</option>").join("") : '<option value="__none">No technician holds this item</option>';
+  if (prev !== null && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  $("bk-site-l").hidden = S.mode !== "use";
+  if (document.activeElement !== $("bk-cat")) $("bk-cat").value = catOf(it);
+  const sites = Object.entries(b.site);
+  $("bk-hist").innerHTML = sites.length ? '<h3 style="margin-bottom:6px">Used so far</h3><div class="kv">' + sites.map(([s,n]) => "<span>" + h(s) + " <b>" + qf(n) + " " + h(it.unit) + "</b></span>").join("") + "</div>" : "";
+}
+async function saveBook(){ const by = myName(); if (!by) return; const C = compute(S.items, S.moves), b = C[S.bookId], from = $("bk-from").value, qty = toNum($("bk-qty").value), err = $("bk-err");
+  if (from === "__none"){ err.textContent = "Nothing to return: no technician holds this item."; return; }
+  const avail = from ? (b.tech[from] || 0) : b.store;
+  if (!(qty > 0)){ err.textContent = "Enter a quantity above zero."; return; }
+  if (qty > avail + 1e-9){ err.textContent = "Only " + qf(avail) + " " + b.item.unit + " available from " + (from || "the store") + "."; return; }
+  const site = $("bk-site").value.trim();
+  if (S.mode === "use" && !site){ err.textContent = "Enter the site where this was used."; return; }
+  err.textContent = ""; $("bk-save").disabled = true;
+  try { await db.collection("moves").add({ type:S.mode, itemId:S.bookId, qty, tech:from, site:S.mode === "use" ? site : "", date:$("bk-date").value || today(), note:$("bk-note").value.trim(), by, at:new Date().toISOString() });
+    toast(S.mode === "use" ? "Booked " + qf(qty) + " " + b.item.unit + " to " + site : "Returned " + qf(qty) + " " + b.item.unit + " to the store"); $("dlg-book").close(); }
+  catch(e){ fail(e); } finally { $("bk-save").disabled = false; }
+}
+
+/* ---------- handover ---------- */
+async function issue(){ const by = myName(); if (!by) return; const err = $("ho-err"), tech = $("ho-tech").value.trim().replace(/\s+/g," "), C = compute(S.items, S.moves);
+  if (!tech){ err.textContent = "Enter who is receiving the stock."; $("ho-tech").focus(); return; }
+  const lines = [];
+  for (const id in S.draft){ const qty = toNum(S.draft[id]); if (!(qty > 0) || !C[id]) continue; const b = C[id];
+    if (qty > b.store + 1e-9){ err.textContent = b.item.desc + ": only " + qf(b.store) + " in store."; return; }
+    lines.push({ itemId:id, code:b.item.code, desc:b.item.desc, qty, unit:b.item.unit, price:b.item.price, quote:b.item.quoteId }); }
+  if (!lines.length){ err.textContent = "Enter a quantity for at least one item."; return; }
+  err.textContent = ""; $("ho-go").disabled = true;
+  const next = S.handovers.reduce((a,x) => Math.max(a, parseInt(x.id.replace(/\D/g,""),10) || 0), 0) + 1, id = "HO-" + String(next).padStart(4,"0"), date = $("ho-date").value || today();
+  try { await db.doc("handovers/" + id).set({ tech, by, date, note:$("ho-note").value.trim(), lines, at:new Date().toISOString() });
+    for (const l of lines) await db.collection("moves").add({ type:"issue", itemId:l.itemId, qty:l.qty, tech, site:"", date, note:"", by, handoverId:id, at:new Date().toISOString() });
+    S.draft = {}; $("ho-note").value = ""; $("ho-tech").value = ""; toast(id + " created for " + tech); schedule(); setTimeout(() => openSlip(id), 150); }
+  catch(e){ fail(e); } finally { $("ho-go").disabled = false; }
+}
+function openSlip(id){ const x = S.handovers.find(v => v.id === id); if (!x) return; S.slipId = id; let total = 0;
+  $("sl-title").textContent = "Handover " + id; $("sl-err").textContent = ""; $("sl-del").textContent = "Remove this handover"; $("sl-del").dataset.armed = "";
+  
+  $("sl-body").innerHTML = "<div><h3>" + h(COMPANY.name) + ' · Stock handover note</h3><div class="small muted">' + h(COMPANY.legal + " · " + COMPANY.address) + '</div></div><div class="kv"><span>No. <b>' + h(id) + "</b></span><span>Date <b>" + h(x.date) + "</b></span><span>Issued to <b>" + h(x.tech) + "</b></span><span>Issued by <b>" + h(x.by) + "</b></span></div>" +
+    '<div class="scroll"><table><thead><tr><th>Code</th><th>Description</th><th class="r">Qty</th><th class="r">Value</th></tr></thead><tbody>' + x.lines.map(l => { total += l.qty*l.price; return '<tr><td class="code">' + h(l.code) + "</td><td>" + h(l.desc) + '</td><td class="r num">' + qf(l.qty) + " " + h(l.unit) + '</td><td class="r num">' + money(l.qty*l.price) + "</td></tr>"; }).join("") +
+    '<tr><td colspan="3" class="r"><b>Total value handed over (excl. VAT)</b></td><td class="r num"><b>' + money(total) + "</b></td></tr></tbody></table></div><p>" + h(ACK(x.tech)) + '</p><div class="sig"><div>Received by: ' + h(x.tech) + "<br>Signature and date</div><div>Issued by: " + h(x.by) + "<br>Signature and date</div></div>";
+  fillSigned(); $("sl-file").value = "";
+  $("dlg-slip").showModal(); }
+function slipDoc(){ const x = S.handovers.find(v => v.id === S.slipId); return x ? { x, doc:buildSlip(window.jspdf.jsPDF, (d,o) => d.autoTable(o), { ...x, no:x.id }) } : null; }
+function slipPdf(){ const r = slipDoc(); if (r) r.doc.save(r.x.id + " " + r.x.tech.replace(/[^\w -]/g,"") + ".pdf"); }
+function slipPrint(){ const r = slipDoc(); if (!r) return; r.doc.autoPrint(); const w = window.open(r.doc.output("bloburl"), "_blank"); if (!w) $("sl-err").textContent = "Your browser blocked the print window. Use Download PDF and print that."; }
+async function delHandover(id){ try { for (const m of S.moves.filter(m => m.handoverId === id)) await db.doc("moves/" + m.id).delete(); await db.doc("handovers/" + id).delete(); toast(id + " removed. Its stock is back in the store."); } catch(e){ fail(e); } }
+
+/* ---------- import ---------- */
+async function readPdf(file){ const err = $("imp-err"); err.textContent = "";
+  try { if (!window.pdfjsLib) throw 0; const pdf = await pdfjsLib.getDocument({ data:new Uint8Array(await file.arrayBuffer()) }).promise; let lines = [];
+    for (let p = 1; p <= pdf.numPages; p++){ const tc = await (await pdf.getPage(p)).getTextContent(); lines = lines.concat(linesFromPdfItems(tc.items)); }
+    showImport(parseQuote(lines)); }
+  catch(e){ err.textContent = "That PDF could not be read here. Use “Paste text instead”, or add the lines by hand."; } }
+function impLabels(){ const st = S.impMode === "store";
+  $("imp-no-l").textContent = st ? "Reference" : "Invoice number"; $("imp-date-l").textContent = st ? "Date counted" : "Invoice date"; $("imp-site-l").textContent = st ? "Store / location" : "Project / site";
+  $("imp-sup-w").hidden = st; $("imp-xl-w").hidden = !st; $("imp-save").textContent = st ? "Save to stock" : "Save invoice to stock"; }
+function startStore(){ const n = S.quotes.reduce((a,q) => q.kind === "store" ? Math.max(a, parseInt(q.id.replace(/\D/g,""),10) || 0) : a, 0) + 1;
+  S.impMode = "store"; S.imp = { docNo:"STORE-" + String(n).padStart(3,"0"), supplier:"", date:today(), orderNo:"", subtotal:null, items:[{ code:"", desc:"", qty:1, unit:"ea", price:0 }] };
+  $("imp-err").textContent = ""; $("imp-no").value = S.imp.docNo; $("imp-sup").value = ""; $("imp-date").value = S.imp.date; $("imp-site").value = ""; $("imp-xl").value = ""; $("imp-review").hidden = false; impLabels(); drawImport(); $("imp-site").focus(); }
+function addPasted(){ const rows = $("imp-xl").value.split(/\r?\n/).map(r => r.split("\t").map(c => c.trim())).filter(r => r.some(Boolean)), out = [];
+  for (const r of rows){ let code = "", desc = "", qty, unit = "ea", price = 0;
+    if (r.length >= 3){ code = r[0]; desc = r[1]; qty = r[2]; if (r.length >= 5){ unit = r[3] || "ea"; price = toNum(r[4].replace(/^R/i,"")); } else if (r.length === 4){ if (/^R?\s*[\d.,\s]+$/i.test(r[3])) price = toNum(r[3].replace(/^R/i,"")); else unit = r[3] || "ea"; } }
+    else if (r.length === 2){ desc = r[0]; qty = r[1]; } else continue;
+    if (!/\d/.test(qty || "") || /[A-Za-z]{3,}/.test(qty)) continue;   // header row or no quantity
+    out.push({ code, desc, qty:toNum(qty), unit, price }); }
+  if (!out.length){ $("imp-err").textContent = "No rows with a quantity were found. Check the column order: Code, Description, Quantity, Unit, Unit price."; return; }
+  $("imp-err").textContent = ""; S.imp.items = S.imp.items.filter(i => i.code || i.desc).concat(out); $("imp-xl").value = ""; drawImport(); toast(out.length + " row" + (out.length===1?"":"s") + " added"); }
+function showImport(p){ S.impMode = "quote"; impLabels(); if (!p.items.length){ $("imp-err").textContent = "No item lines were found in that document. You can add lines by hand below."; }
+  S.imp = p; $("imp-no").value = p.docNo; $("imp-sup").value = p.supplier; $("imp-date").value = p.date; $("imp-site").value = p.orderNo; $("imp-review").hidden = false; drawImport(); }
+function drawImport(){ const p = S.imp; let sum = 0; const inStore = {}, over = {};
+  for (const b of Object.values(compute(S.items, S.moves))) if (b.store > 0){ inStore[b.item.code] = (inStore[b.item.code]||0) + b.store; if (isOver(b)) over[b.item.code] = (over[b.item.code]||0) + b.store; }
+  $("imp-table").innerHTML = '<thead><tr><th>Code</th><th>Description</th><th class="r">Qty</th><th>Unit</th><th class="r">Unit price</th><th>Already in store</th><th></th></tr></thead><tbody>' + p.items.map((it,i) => { sum += it.qty*it.price;
+    return '<tr><td><input id="ic-' + i + '" data-i="' + i + '" data-k="code" value="' + h(it.code) + '" style="min-width:130px"></td><td><input id="id-' + i + '" data-i="' + i + '" data-k="desc" value="' + h(it.desc) + '" style="min-width:240px"></td><td><input id="iq-' + i + '" class="qty num" data-i="' + i + '" data-k="qty" type="number" step="any" value="' + it.qty + '"></td><td><input id="iu-' + i + '" data-i="' + i + '" data-k="unit" value="' + h(it.unit) + '" style="width:70px"></td><td><input id="ip-' + i + '" class="qty num" data-i="' + i + '" data-k="price" type="number" step="any" value="' + (+it.price.toFixed(4)) + '"></td><td class="small num" style="white-space:nowrap">' + (over[it.code] ? '<b style="color:var(--pink)">' + qf(over[it.code]) + " leftover</b>" : inStore[it.code] ? qf(inStore[it.code]) + " on other projects" : '<span class="zero">–</span>') + '</td><td><button class="sm danger" data-impdel="' + i + '">Remove</button></td></tr>'; }).join("") + "</tbody>";
+  const ck = $("imp-check"); const ok = p.subtotal != null && Math.abs(sum - p.subtotal) < 0.05;
+  ck.innerHTML = p.items.length + " lines, total " + money(sum) + (p.subtotal != null ? (ok ? ' <b style="color:var(--ok)">matches the invoice subtotal</b>' : ' <b style="color:var(--crit)">invoice subtotal is ' + money(p.subtotal) + ", check the lines</b>") : ""); }
+async function saveImport(){ const by = myName(); if (!by) return; const p = S.imp, err = $("imp-err"), id = $("imp-no").value.trim().replace(/[^A-Za-z0-9_.-]/g,"");
+  if (!id){ err.textContent = "Enter the invoice number."; return; }
+  if (quoteOf(id)){ err.textContent = id + " is already imported."; return; }
+  const store = S.impMode === "store";
+  if (store && !$("imp-site").value.trim()){ err.textContent = "Enter which store or location this stock is in."; $("imp-site").focus(); return; }
+  const items = p.items.filter(i => i.desc.trim() && i.qty > 0); if (!items.length){ err.textContent = "Add at least one line with a quantity."; return; }
+  err.textContent = ""; $("imp-save").disabled = true;
+  try { await db.doc("quotes/" + id).set({ supplier:$("imp-sup").value.trim(), date:$("imp-date").value.trim(), site:$("imp-site").value.trim(), colour:S.quotes.reduce((a,q) => Math.max(a, (q.colour ?? -1)), -1) + 1, by, at:new Date().toISOString(), ...(store ? { kind:"store", status:"done" } : {}) });
+    for (let i = 0; i < items.length; i++){ const it = items[i]; await db.doc("items/" + id + "-" + String(i+1).padStart(3,"0")).set({ quoteId:id, code:it.code.trim(), desc:it.desc.trim(), qty:it.qty, unit:it.unit.trim() || "ea", price:it.price }); }
+    S.imp = null; $("imp-review").hidden = true; $("imp-file").value = ""; $("imp-text").value = ""; toast(store ? items.length + " line" + (items.length===1?"":"s") + " added to stock" : id + " imported with " + items.length + " lines"); }
+  catch(e){ fail(e); } finally { $("imp-save").disabled = false; } }
+
+/* ---------- events ---------- */
+function showTab(t){ if (!["stock","onhand","handover","techs","assets","activity","quotes","pos"].includes(t)) t = "stock";
+  for (const b of document.querySelectorAll("nav.tabs button")) b.setAttribute("aria-selected", b.dataset.tab === t);
+  for (const s of document.querySelectorAll("section.tab")) s.hidden = s.id !== "tab-" + t;
+  if (t === "quotes" && !buLoaded && typeof api === "function") loadBackups(); }
+function arm(btn, fn){ if (btn.dataset.armed){ fn(); } else { btn.dataset.armed = "1"; btn.textContent = btn.id === "bu-restore" ? "Confirm: replace all current data" : btn.dataset.arch ? "Confirm archive" : "Confirm remove"; setTimeout(() => { if (btn.isConnected){ btn.dataset.armed = ""; btn.textContent = btn.id === "sl-del" ? "Remove this handover" : btn.id === "ad-del" ? "Remove this asset" : btn.id === "pd-del" ? "Delete this PO" : btn.dataset.arch ? "Archive" : btn.id === "bu-restore" ? "Restore this backup" : btn.id === "ex-del" ? "Remove example" : "Remove"; } }, 4000); } }
+document.addEventListener("click", (e) => { const t = e.target.closest("button"); if (!t) return; const d = t.dataset;
+  if (d.tab){ showTab(d.tab); try { history.replaceState(null, "", "#" + d.tab); } catch(_){} }
+  else if (d.close !== undefined) t.closest("dialog").close();
+  else if (d.book) openBook(d.book, d.from);
+  else if (d.mode){ S.mode = d.mode; $("bk-err").textContent = ""; fillBook(compute(S.items, S.moves), true); }
+  else if (d.slip) openSlip(d.slip);
+  else if (d.asset) openAsset(d.asset);
+  else if (d.po) openPO(d.po);
+  else if (t.id === "po-new") openPO(null);
+  else if (t.id === "pd-save") savePO();
+  else if (t.id === "pd-del") arm(t, () => { const id = S.poId; $("dlg-po").close(); S.poId = null; db.doc("pos/" + id).delete().then(() => toast("PO deleted")).catch(fail); });
+  else if (t.id === "pd-undoc") arm(t, () => fetch("/api/podoc/" + encodeURIComponent(S.poId), { method:"DELETE" }).then(() => refresh()).then(() => toast("PO document removed")).catch(fail));
+  else if (d.arch) arm(t, () => archiveQuote(d.arch));
+  else if (d.unarch) db.doc("quotes/" + d.unarch).update({ archived:false }).then(() => toast(d.unarch + " restored")).catch(fail);
+  else if (t.id === "as-new") openAsset(null);
+  else if (t.id === "rep-go") downloadReport();
+  else if (t.id === "bu-go"){ markBackup(); location.href = "/api/backup"; toast("Backup is downloading. Keep the zip file somewhere safe."); }
+  else if (t.id === "bu-restore") arm(t, restoreBackup);
+  else if (t.id === "as-rep") downloadReport("assets");
+  else if (t.id === "ad-save") saveAsset();
+  else if (d.delphoto) arm(t, () => fetch("/api/photo/" + encodeURIComponent(S.assetId) + "/" + encodeURIComponent(d.delphoto), { method:"DELETE" }).then(() => refresh()).then(() => toast("Photo removed")).catch(fail));
+  else if (t.id === "ad-del") arm(t, () => { const id = S.assetId; $("dlg-asset").close(); S.assetId = null; db.doc("assets/" + id).delete().then(() => toast(id + " removed")).catch(fail); });
+  else if (d.delmove) arm(t, () => db.doc("moves/" + d.delmove).delete().then(() => toast("Entry removed")).catch(fail));
+  else if (d.delquote) arm(t, async () => { try { for (const i of S.items.filter(i => i.quoteId === d.delquote)) await db.doc("items/" + i.id).delete(); await db.doc("quotes/" + d.delquote).delete(); toast(d.delquote + " removed"); } catch(e){ fail(e); } });
+  else if (d.impdel){ S.imp.items.splice(+d.impdel, 1); drawImport(); }
+  else if (t.id === "ex-del") arm(t, async () => { const x = S.handovers.find(v => v.example); if (!x) return; try { for (const m of S.moves.filter(m => m.example && !m.handoverId)) await db.doc("moves/" + m.id).delete(); } catch(e){ fail(e); return; } delHandover(x.id); });
+  else if (t.id === "sl-del") arm(t, () => { const id = S.slipId; $("dlg-slip").close(); delHandover(id); });
+  else if (t.id === "bk-save") saveBook();
+  else if (t.id === "ho-go") issue();
+  else if (t.id === "sl-unsign") arm(t, () => fetch("/api/signed/" + encodeURIComponent(S.slipId), { method:"DELETE" }).then(() => refresh()).then(() => toast("Signed slip removed")).catch(fail));
+  else if (t.id === "sl-pdf") slipPdf();
+  else if (t.id === "sl-print") slipPrint();
+  else if (t.id === "imp-store") startStore();
+  else if (t.id === "imp-xl-go") addPasted();
+  else if (t.id === "imp-paste-toggle") $("imp-paste").hidden = !$("imp-paste").hidden;
+  else if (t.id === "imp-read") showImport(parseQuote($("imp-text").value.split(/\r?\n/)));
+  else if (t.id === "imp-add"){ S.imp.items.push({ code:"", desc:"", qty:1, unit:"ea", price:0 }); drawImport(); }
+  else if (t.id === "imp-save") saveImport();
+});
+document.addEventListener("input", (e) => { const t = e.target;
+  if (t.dataset.hq){ S.draft[t.dataset.hq] = t.value; hoSum(); }
+  else if (t.dataset.k){ const it = S.imp.items[+t.dataset.i], k = t.dataset.k; it[k] = (k === "qty" || k === "price") ? toNum(t.value) : t.value; }
+  else if (["q","fq","fs","fc","ft","ho-q","ho-fq","ho-fc","oh-q","oh-fc","oh-fs","as-q","as-ft","as-fh","as-fc","po-q","po-fs","po-fp"].includes(t.id)) schedule();
+  else if (t.id === "me"){ try { localStorage.setItem("stock-name", t.value); } catch(_){} } });
+document.addEventListener("change", (e) => { const t = e.target;
+  if (t.id === "imp-file" && t.files[0]) readPdf(t.files[0]);
+  else if (t.id === "sl-file" && t.files[0]) uploadSigned(t.files[0]);
+  else if (t.id === "ad-file" && t.files.length) uploadPhotos([...t.files]);
+  else if (t.id === "pd-file" && t.files[0]) uploadPODoc(t.files[0]);
+  else if (t.dataset.pok) quickPO(t.dataset.poid, t.dataset.pok, t.value);
+  else if (t.id === "bu-file"){ $("bu-restore").hidden = !t.files[0]; $("bu-restore").textContent = "Restore this backup"; $("bu-restore").dataset.armed = ""; $("bu-err").textContent = ""; }
+  else if (t.dataset.k) drawImport();
+  else if (t.dataset.qk){ const q = quoteOf(t.dataset.qid), v = t.value.trim(); if (!q || (q[t.dataset.qk] || (t.dataset.qk === "status" ? "active" : "")) === v) return;
+    db.doc("quotes/" + q.id).update({ [t.dataset.qk]: v }).then(() => toast(t.dataset.qk === "status" ? (v === "done" ? (q.site||q.id) + " completed. Its remaining store stock is now leftover." : (q.site||q.id) + " is active again.") : "Site type saved")).catch(fail); }
+  else if (t.id === "bk-cat" && S.bookId) db.doc("items/" + S.bookId).update({ cat:t.value }).then(() => toast("Stock type changed")).catch(fail); });
+
+/* ---------- start: talks to the stock server ---------- */
+const subs = {}; let version = -1, busy = false;
+async function api(method, url, body){ let r;
+  try { r = await fetch(url, { method, headers:{ "Content-Type":"application/json" }, body: body ? JSON.stringify(body) : undefined }); } catch(_){ throw { code:"offline" }; }
+  if (r.status === 401){ location.href = "/login"; throw { code:"signed_out" }; }
+  if (!r.ok) throw { code:"server" };
+  return r.json(); }
+async function refresh(){ const s = await api("GET", "/api/state"); version = s.version;
+  for (const k in subs) subs[k]({ docs:(s.data[k] || []).map(d => ({ id:d.id, data:() => d.data })) }); }
+db = {
+  collection:(k) => ({ limit(){ return this; }, onSnapshot(fn){ subs[k] = fn; }, add: async (d) => { await api("POST", "/api/docs/" + k, d); await refresh(); } }),
+  doc:(p) => { const [c, id] = p.split("/"), u = "/api/docs/" + c + "/" + encodeURIComponent(id); return {
+    set: async (d) => { await api("PUT", u, d); await refresh(); }, update: async (d) => { await api("PATCH", u, d); await refresh(); }, delete: async () => { await api("DELETE", u); await refresh(); } }; } };
+(async function start(){
+  try { $("me").value = localStorage.getItem("stock-name") || ""; } catch(_){}
+  $("ho-date").value = today(); showTab((location.hash || "").slice(1)); render();
+  for (const k of ["quotes","items","moves","handovers","assets","pos"]) db.collection(k).onSnapshot((snap) => { S[k === "items" ? "rawItems" : k] = snap.docs.map(d => ({ id:d.id, ...d.data() })); S.ready[k] = true; schedule(); });
+  try { await refresh(); } catch(e){ S.ready.nodb = true; $("f-total-s").textContent = "Not connected"; render(); }
+  setInterval(async () => { if (busy || document.hidden) return; busy = true;
+    try { const v = await api("GET", "/api/version"); if (v.version !== version) await refresh(); if (S.ready.nodb){ S.ready.nodb = false; schedule(); } } catch(_){} finally { busy = false; } }, 3000);
+})();
+</script>
+
 </body>
 </html>
